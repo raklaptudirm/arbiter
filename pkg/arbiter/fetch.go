@@ -72,11 +72,21 @@ func NewIdentifier(engine string) *Identifier {
 func Fetch(engine *Identifier) error {
 	// If the repository has been cloned previously, just pull any new changes.
 	if _, err := os.Stat(engine.Path); !errors.Is(err, fs.ErrNotExist) {
-		return execute_info(
+		err = execute_info(
 			"Pulling latest changes to the Engine's source repository...",
 			"Error encountered while pulling repository",
 			"git", "-C", engine.Path, "pull",
 		)
+
+		// Successfully updated repository; return.
+		if err == nil {
+			return nil
+		}
+
+		logrus.Error("Pulling repository failed, making a fresh clone")
+		_ = os.RemoveAll(engine.Path) // Remove the repository
+
+		// Fallthrough into cloning the repository.
 	}
 
 	// If the repository hasn't been cloned before, clone it into the machine.
@@ -88,10 +98,7 @@ func Fetch(engine *Identifier) error {
 }
 
 func execute_info(info, errStr, command string, args ...string) error {
-	s := spinner.New(spinner.CharSets[SPIN], 100*time.Millisecond)
 	logrus.Info(info)
-	s.Start()
-	defer s.Stop()
 	return execute(errStr, command, args...)
 }
 
@@ -112,9 +119,17 @@ func execute(errStr, command string, args ...string) error {
 		cmd.Stderr = os.Stderr
 	}
 
-	fmt.Print("\x1b[33m")
+	s := spinner.New(spinner.CharSets[SPIN], 100*time.Millisecond)
+
+	// Pre-run stuff
+	fmt.Print("\x1b[33m") // Make the outputs yellow.
+	s.Start()             // Start the ~working~ spinner.
+
 	err := cmd.Run()
-	fmt.Print("\x1b[0m")
+
+	// Post-run stufff
+	s.Stop()             // Stop the ~working~ spinner.
+	fmt.Print("\x1b[0m") // Reset the terminal's color.
 
 	// Close the pipes.
 	_ = ow.Close()
@@ -123,10 +138,10 @@ func execute(errStr, command string, args ...string) error {
 	if err != nil {
 		// Dump command's stdout and stderr in case of failure.
 		if !logrus.IsLevelEnabled(logrus.TraceLevel) {
-			fmt.Print("\x1b[31m")
+			fmt.Print("==== \x1b[31mERROR\x1b[0m ====\n\x1b[31m")
 			_, _ = io.Copy(os.Stdout, or)
 			_, _ = io.Copy(os.Stderr, er)
-			fmt.Print("\x1b[0m")
+			fmt.Print("\x1b[0m===============\n")
 		}
 		if errStr == "" {
 			return err
