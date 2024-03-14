@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 
 	"laptudirm.com/x/arbiter/internal/util"
@@ -48,48 +49,45 @@ func Install(engine *Identifier) error {
 	}
 
 	// Fetch the engine repository.
-	if err := Fetch(engine); err != nil {
+	repository, err := Fetch(engine)
+	if err != nil {
 		return err
 	}
 
-	// Reset repository state after stuff has been done.
-	branch, _ := output("git", "-C", engine.Path, "branch", "--show-current")
-	defer execute("", "git", "-C", engine.Path, "checkout", branch)
-	logrus.WithField("branch", branch).Debug("Master branch for repository")
+	worktree, _ := repository.Worktree()
 
+	// Reset repository state after stuff has been done.
+	head, _ := repository.Head()
+	defer worktree.Checkout(&git.CheckoutOptions{Hash: head.Hash()})
+	logrus.WithField("old-head", head.Hash().String()).
+		Debug("Fetched current head for rollback")
+
+	// Version string to display.
 	var install_tag string
 
 	// Figure out which version to install and checkout to that tag.
 	switch engine.Version {
-	case "latest": // Install latest development version.
-		install_tag, _ = output("git", "-C", engine.Path, "describe", "--tags")
 	case "stable": // Install latest stable (tagged) version.
-		stable_tag, err := output("git", "-C", engine.Path, "describe", "--tags", "--abbrev=0")
-		logrus.WithField("stable-tag", stable_tag).Debug("Got branch stable tag")
-		if err == nil {
-			_ = execute(
-				fmt.Sprintf("Unable to find version \x1b[31m%s\x1b[0m.", engine.Version),
-				"git", "-C", engine.Path, "checkout", stable_tag,
-			)
-		}
+		// TODO: Add stable tag support
+		fallthrough
+	case "latest": // Install latest development version.
+		install_tag = head.Hash().String()[:6]
 
-		install_tag = stable_tag
 	default: // Install the given version.
-		err := execute(
-			fmt.Sprintf("Unable to find version \x1b[32m%s\x1b[0m.", engine.Version),
-			"git", "-C", engine.Path, "checkout", engine.Version,
-		)
-
+		tag, err := repository.Tag(engine.Version)
 		if err != nil {
-			return err
+			return fmt.Errorf("Unable to find version \x1b[31m%s\x1b[0m", engine.Version)
 		}
+
+		// Checkout to the provided version.
+		_ = worktree.Checkout(&git.CheckoutOptions{Hash: tag.Hash()})
 		install_tag = engine.Version
 	}
 
 	// Building the engine is done with the repository root as the current
 	// working directory. Any build script can assume that this fact is true.
 	// A proper build script will build the engine and put it in ./engine-bin.
-	if err := os.Chdir(engine.Path); err != nil {
+	if err := os.Chdir(engine.LocalPath); err != nil {
 		return err
 	}
 

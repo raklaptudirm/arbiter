@@ -17,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +24,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 
 	"laptudirm.com/x/arbiter/internal/util"
@@ -32,10 +32,10 @@ import (
 )
 
 type Identifier struct {
-	Name    string
-	Source  string
-	Version string
-	Path    string
+	Name      string
+	SourceURL string
+	Version   string
+	LocalPath string
 
 	IsCore bool
 }
@@ -46,7 +46,7 @@ func NewIdentifier(engine string) *Identifier {
 	var identifier Identifier
 
 	identifier.Name = filepath.Base(source)
-	identifier.Path = filepath.Join(util.SourceDirectory, strings.ToLower(identifier.Name))
+	identifier.LocalPath = filepath.Join(util.SourceDirectory, strings.ToLower(identifier.Name))
 	identifier.Version = version
 	if !found {
 		// By-default try to install the latest stable release.
@@ -56,50 +56,50 @@ func NewIdentifier(engine string) *Identifier {
 	switch strings.Count(source, "/") {
 	case 0:
 		// Arbiter-core Engine: <engine-name>
-		identifier.Source = data.Engines[source].Source
+		identifier.SourceURL = data.Engines[source].Source
 		identifier.IsCore = true
 	case 1:
 		// Github Engine: <owner>/<engine-name>
-		identifier.Source = "https://github.com/" + source
+		identifier.SourceURL = "https://github.com/" + source
 	default:
 		// Git Repository Engine: <full-repository-url>
-		identifier.Source = source
+		identifier.SourceURL = source
 	}
 
 	return &identifier
 }
 
-func Fetch(engine *Identifier) error {
-	// If the repository has been cloned previously, just pull any new changes.
-	if _, err := os.Stat(engine.Path); !errors.Is(err, fs.ErrNotExist) {
-		err = execute_info(
-			"Pulling latest changes to the Engine's source repository...",
-			"Error encountered while pulling repository",
-			"git", "-C", engine.Path, "pull",
-		)
+func Fetch(engine *Identifier) (*git.Repository, error) {
+	s := spinner.New(spinner.CharSets[SPIN], 100*time.Millisecond)
+	defer s.Stop()
 
-		// Successfully updated repository; return.
-		if err == nil {
-			return nil
+	// If the repository has been cloned previously, just pull any new changes.
+	if r, err := git.PlainOpen(engine.LocalPath); err == nil {
+		logrus.Info("Pulling from the Engine's source repository...")
+		s.Start()
+		if w, err := r.Worktree(); err == nil {
+			// Try and pull latest changes to the repository.
+			err := w.Pull(&git.PullOptions{RemoteURL: engine.SourceURL})
+			// If there are no errors, or the branch is already upto date, return.
+			if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
+				return r, nil
+			}
+
+			logrus.Debug(err)
 		}
 
-		logrus.Error("Pulling repository failed, making a fresh clone")
-		_ = os.RemoveAll(engine.Path) // Remove the repository
+		s.Stop()
 
-		// Fallthrough into cloning the repository.
+		// Fallback to cloning since the current repository is unusable.
+		logrus.Error("Pulling repository failed, making a fresh clone")
+		_ = os.RemoveAll(engine.LocalPath) // Remove the repository
 	}
 
-	// If the repository hasn't been cloned before, clone it into the machine.
-	return execute_info(
-		"Fetching the Engine's source repository...",
-		"Error encountered while fetching repository",
-		"git", "clone", engine.Source, engine.Path,
-	)
-}
+	s.Start()
 
-func execute_info(info, errStr, command string, args ...string) error {
-	logrus.Info(info)
-	return execute(errStr, command, args...)
+	// If the repository hasn't been cloned previously or is corrupted, clone it.
+	logrus.Info("Fetching the Engine's source repository...")
+	return git.PlainClone(engine.LocalPath, false, &git.CloneOptions{URL: engine.SourceURL})
 }
 
 func execute(errStr, command string, args ...string) error {
@@ -150,9 +150,4 @@ func execute(errStr, command string, args ...string) error {
 	}
 
 	return nil
-}
-
-func output(command string, args ...string) (string, error) {
-	ba, err := exec.Command(command, args...).Output()
-	return strings.Trim(string(ba), " \t\n\r"), err
 }
