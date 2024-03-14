@@ -13,7 +13,10 @@
 
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+)
 
 func Root() *cobra.Command {
 	root := &cobra.Command{
@@ -22,6 +25,13 @@ func Root() *cobra.Command {
 
 		SilenceErrors: true,
 		SilenceUsage:  true,
+
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			// If --trace flag is provided, set logging level to Trace.
+			if cmd.Flag("trace").Changed {
+				logrus.SetLevel(logrus.TraceLevel)
+			}
+		},
 	}
 
 	// global flags
