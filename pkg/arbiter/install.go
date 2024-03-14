@@ -153,16 +153,12 @@ func makefile_install() error {
 		return err
 	}
 
-	// Run the OB-compliant Makefile to build the engine.
-	build := exec.Command("make", "-j", "EXE=engine-binary")
+	err := execute(
+		"Makefile failed to build the engine binary",
+		"make", "-j", "EXE=engine-binary",
+	)
 
-	// Show the commands output if logging level is Trace.
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		build.Stdout = os.Stdout
-		build.Stderr = os.Stderr
-	}
-
-	if err := build.Run(); err != nil {
+	if err != nil {
 		return err
 	}
 

@@ -16,6 +16,7 @@ package arbiter
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -98,6 +99,13 @@ func execute(errStr, command string, args ...string) error {
 	logrus.Debugf("\x1b[34m%s\x1b[0m %s\n", command, strings.Join(args, " "))
 	cmd := exec.Command(command, args...)
 
+	// Creates pipes for stdout and stderr.
+	or, ow, _ := os.Pipe()
+	er, ew, _ := os.Pipe()
+
+	cmd.Stdout = ow
+	cmd.Stderr = ew
+
 	// Show the commands output if logging level is Trace.
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		cmd.Stdout = os.Stdout
@@ -107,7 +115,19 @@ func execute(errStr, command string, args ...string) error {
 	fmt.Print("\x1b[33m")
 	err := cmd.Run()
 	fmt.Print("\x1b[0m")
+
+	// Close the pipes.
+	_ = ow.Close()
+	_ = ew.Close()
+
 	if err != nil {
+		// Dump command's stdout and stderr in case of failure.
+		if !logrus.IsLevelEnabled(logrus.TraceLevel) {
+			fmt.Print("\x1b[31m")
+			_, _ = io.Copy(os.Stdout, or)
+			_, _ = io.Copy(os.Stderr, er)
+			fmt.Print("\x1b[0m")
+		}
 		if errStr == "" {
 			return err
 		}
