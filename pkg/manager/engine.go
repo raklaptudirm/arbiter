@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 
@@ -28,26 +29,25 @@ import (
 )
 
 type Engine struct {
-	Name    string
-	Author  string
-	Version string
+	Name   string
+	Author string
 
 	SourceURL string
 
 	Info *arbiter.EngineInfo
+
+	Path string
+	*git.Repository
+	*git.Worktree
 }
 
-func NewEngine(ident string) (*Engine, error) {
+func NewEngine(source string) (*Engine, error) {
 	// <git-engine>[@<version>]
-	source, version, found := strings.Cut(ident, "@")
 	var engine Engine
 
 	engine.Name = filepath.Base(source)
-	engine.Version = version
-	if !found {
-		// By-default try to install the latest stable release.
-		engine.Version = "stable"
-	}
+
+	engine.Path = filepath.Join(arbiter.SourceDirectory, strings.ToLower(engine.Name))
 
 	switch strings.Count(source, "/") {
 	case 0:
@@ -68,14 +68,13 @@ func NewEngine(ident string) (*Engine, error) {
 	default:
 		// Git Repository Player: <full-git-url>
 		engine.SourceURL = source
-		engine.Author = "Anonymous"
+		engine.Author = filepath.Base(filepath.Dir(source))
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"name":    engine.Name,
-		"author":  engine.Author,
-		"version": engine.Version,
-		"source":  engine.SourceURL,
+		"name":   engine.Name,
+		"author": engine.Author,
+		"source": engine.SourceURL,
 	}).Debug("Created new manager.Engine")
 
 	return &engine, nil
@@ -86,12 +85,12 @@ type Version struct {
 	Hash plumbing.Hash
 }
 
-func (repo *Repository) NewVersion(v string) (Version, error) {
+func (engine *Engine) ResolveVersion(v string) (Version, error) {
 	var version Version
 	switch v {
 	// Find the latest stable(tagged) version of the engine.
 	case "stable":
-		stable, err := repo.Stable()
+		stable, err := engine.Stable()
 		if err != nil {
 			return version, err
 		}
@@ -101,7 +100,7 @@ func (repo *Repository) NewVersion(v string) (Version, error) {
 
 	// Find the latest development version of the engine.
 	case "latest":
-		latest, err := repo.Head()
+		latest, err := engine.Head()
 		if err != nil {
 			return version, errors.New("Unable to find version \x1b[31mstable\x1b[0m")
 		}
@@ -111,7 +110,7 @@ func (repo *Repository) NewVersion(v string) (Version, error) {
 
 	// Find the version corresponding to the given tag.
 	default:
-		tag, err := repo.Tag(v)
+		tag, err := engine.Tag(v)
 		if err != nil {
 			return version, fmt.Errorf("Unable to find version \x1b[31m%s\x1b[0m", v)
 		}
@@ -123,24 +122,24 @@ func (repo *Repository) NewVersion(v string) (Version, error) {
 	return version, nil
 }
 
-func (repo *Repository) Stable() (*plumbing.Reference, error) {
+func (engine *Engine) Stable() (*plumbing.Reference, error) {
 	var stable *plumbing.Reference
 	var stable_date time.Time
 
 	logrus.Debug("Looking for the latest stable release...")
-	tags, err := repo.Tags()
+	tags, err := engine.Tags()
 	if err != nil {
 		return nil, err
 	}
 
 	err = tags.ForEach(func(tag_ref *plumbing.Reference) error {
 		revision := plumbing.Revision(tag_ref.Name().String())
-		commit_hash, err := repo.ResolveRevision(revision)
+		commit_hash, err := engine.ResolveRevision(revision)
 		if err != nil {
 			return err
 		}
 
-		commit, err := repo.CommitObject(*commit_hash)
+		commit, err := engine.CommitObject(*commit_hash)
 		if err != nil {
 			return err
 		}

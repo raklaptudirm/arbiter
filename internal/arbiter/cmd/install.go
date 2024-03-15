@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
@@ -31,23 +32,23 @@ func Install() *cobra.Command {
 			need to add the directory ~/arbiter to your path variable.`),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			engine, err := manager.NewEngine(args[0])
+			source, tag, has_tag := strings.Cut(args[0], "@")
+			if !has_tag {
+				tag = "stable"
+			}
+
+			engine, err := manager.NewEngine(source)
 			if err != nil {
 				return err
 			}
 
-			repo, err := manager.NewBareRepository(engine)
-			if err != nil {
+			fmt.Printf("\x1b[32mInstalling Player:\x1b[0m %s by %s\n\n", engine.Name, engine.Author)
+
+			if err := engine.Fetch(); err != nil {
 				return err
 			}
 
-			fmt.Printf("\x1b[32mInstalling Player:\x1b[0m %s by %s\n\n", repo.Engine.Name, repo.Engine.Author)
-
-			if err := repo.Fetch(); err != nil {
-				return err
-			}
-
-			version, err := repo.NewVersion(engine.Version)
+			version, err := engine.ResolveVersion(tag)
 			if err != nil {
 				return err
 			}
@@ -56,7 +57,7 @@ func Install() *cobra.Command {
 			if !cmd.Flag("force").Changed && engine.Installed(version) {
 				fmt.Printf("\nEngine \x1b[32m%s %s\x1b[0m is already installed.\n", engine.Name, version.Name)
 			} else {
-				if err := repo.InstallEngine(version); err != nil {
+				if err := engine.InstallEngine(version); err != nil {
 					return err
 				}
 			}

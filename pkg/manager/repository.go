@@ -33,35 +33,14 @@ import (
 
 const SPIN = 31
 
-type Repository struct {
-	Engine *Engine
-
-	BuildScript string
-
-	Path string
-	*git.Repository
-	*git.Worktree
-}
-
-func NewBareRepository(engine *Engine) (*Repository, error) {
-	var repo Repository
-	repo.Engine = engine
-
-	repo.Path = filepath.Join(arbiter.SourceDirectory, strings.ToLower(repo.Engine.Name))
-
-	if repo.Engine.Info != nil {
-		repo.BuildScript = repo.Engine.Info.BuildScript
-	}
-
-	return &repo, nil
-}
-
-func (repo *Repository) InstallEngine(version Version) error {
-	if err := repo.Build(version); err != nil {
+func (engine *Engine) InstallEngine(version Version) error {
+	if err := engine.Build(version); err != nil {
 		return err
 	}
 
-	engine_binary := filepath.Join(arbiter.BinaryDirectory, strings.ToLower(repo.Engine.Name))
+	reinstall := engine.Installed(version)
+
+	engine_binary := filepath.Join(arbiter.BinaryDirectory, strings.ToLower(engine.Name))
 	version_binary := engine_binary + "-" + version.Name
 
 	// Move the engine binary to the binary directory.
@@ -70,41 +49,41 @@ func (repo *Repository) InstallEngine(version Version) error {
 	}
 
 	// Register the engine and the new version if they previously weren't.
-	if !repo.Engine.Installed(version) {
-		arbiter.Engines.TryAddEngine(repo.Engine.Name, repo.Engine.Author, repo.Engine.SourceURL)
-		arbiter.Engines.InstallVersion(repo.Engine.Name, version.Name)
+	if !reinstall {
+		arbiter.Engines.TryAddEngine(engine.Name, engine.Author, engine.SourceURL)
+		arbiter.Engines.InstallVersion(engine.Name, version.Name)
 	}
 
-	fmt.Printf("\nInstalled engine \x1b[92m%s %s\x1b[0m.\n", repo.Engine.Name, version.Name)
+	fmt.Printf("\nInstalled engine \x1b[92m%s %s\x1b[0m.\n", engine.Name, version.Name)
 	return nil
 }
 
-func (repo *Repository) Build(version Version) error {
+func (engine *Engine) Build(version Version) error {
 	// Reset repository state after stuff has been done.
-	head, _ := repo.Head()
-	defer util.Ignore(repo.Checkout(&git.CheckoutOptions{Hash: head.Hash()}))
+	head, _ := engine.Head()
+	defer util.Ignore(engine.Checkout(&git.CheckoutOptions{Hash: head.Hash()}))
 	logrus.WithField("target", head.Hash().String()[0:7]).
 		Debug("Repository will be checked back after installation")
-	if err := repo.Checkout(&git.CheckoutOptions{
+	if err := engine.Checkout(&git.CheckoutOptions{
 		Hash: version.Hash,
 	}); err != nil {
 		return err
 	}
 
-	// Building the engine is done with the repo root as the current
+	// Building the engine is done with the engine root as the current
 	// working directory. Any build script can assume that this fact is true.
 	// A proper build script will build the engine and put it in ./engine-bin.
 
 	// Reset directory state after stuff has been done.
 	current_dir, _ := os.Getwd()
 	defer util.Ignore(os.Chdir(current_dir))
-	if err := os.Chdir(repo.Path); err != nil {
+	if err := os.Chdir(engine.Path); err != nil {
 		return err
 	}
 
 	// Some engines registered in arbiter core have custom installation scripts.
-	if repo.Engine.Info != nil && repo.BuildScript != "" {
-		return script_build(repo.BuildScript)
+	if engine.Info != nil && engine.Info.BuildScript != "" {
+		return script_build(engine.Info.BuildScript)
 	}
 
 	return makefile_build()
@@ -183,20 +162,20 @@ func script_build(build_script string) error {
 	return nil
 }
 
-func (repo *Repository) Fetch() error {
+func (engine *Engine) Fetch() error {
 	var err error
 
-	// If the repo has been cloned previously, just pull any new changes.
-	if repo.Repository, err = git.PlainOpen(repo.Path); err == nil {
-		logrus.Info("Pulling from the Player's source repo...")
+	// If the engine has been cloned previously, just pull any new changes.
+	if engine.Repository, err = git.PlainOpen(engine.Path); err == nil {
+		logrus.Info("Pulling from the Player's source engine...")
 		util.StartSpinner()
 
-		if repo.Worktree, err = repo.Repository.Worktree(); err == nil {
-			// Try and pull latest changes to the repo from engine source.
-			err := repo.Pull(&git.PullOptions{
+		if engine.Worktree, err = engine.Repository.Worktree(); err == nil {
+			// Try and pull latest changes to the engine from engine source.
+			err := engine.Pull(&git.PullOptions{
 				// This option is necessary to ensure some other repository isn't
 				// cloned instead of the current engine in its repository directory.
-				RemoteURL: repo.Engine.SourceURL,
+				RemoteURL: engine.SourceURL,
 			})
 
 			util.PauseSpinner()
@@ -211,24 +190,24 @@ func (repo *Repository) Fetch() error {
 
 		util.PauseSpinner()
 
-		// Fallback to cloning since the current repo is unusable.
-		logrus.Error("Pulling repo failed, making a fresh clone")
+		// Fallback to cloning since the current engine is unusable.
+		logrus.Error("Pulling engine failed, making a fresh clone")
 	}
 
 	// Remove any existing stuff in the path.
-	_ = os.RemoveAll(repo.Path)
+	_ = os.RemoveAll(engine.Path)
 
-	// If the repo hasn't been cloned previously or is corrupted, clone it.
-	logrus.Info("Fetching the Player's source repo...")
+	// If the engine hasn't been cloned previously or is corrupted, clone it.
+	logrus.Info("Fetching the Player's source engine...")
 
 	util.StartSpinner()
-	repo.Repository, err = git.PlainClone(repo.Path, false, &git.CloneOptions{
-		URL: repo.Engine.SourceURL,
+	engine.Repository, err = git.PlainClone(engine.Path, false, &git.CloneOptions{
+		URL: engine.SourceURL, SingleBranch: true,
 	})
 	util.PauseSpinner()
 
 	if err == nil {
-		repo.Worktree, err = repo.Repository.Worktree()
+		engine.Worktree, err = engine.Repository.Worktree()
 	}
 
 	return err
