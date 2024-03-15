@@ -90,13 +90,19 @@ func (repo *Repository) InstallEngine() error {
 		}
 	}
 
-	// Move the engine binary to the binary directory.
 	engine_binary := filepath.Join(util.BinaryDirectory, strings.ToLower(repo.Engine.Name))
-	if err := os.Rename("engine-binary", engine_binary); err != nil {
+	version_binary := engine_binary + "-" + version.Name
+
+	// Move the engine binary to the binary directory.
+	if err := os.Rename("engine-binary", version_binary); err != nil {
 		return errors.New("Installer \x1b[31mfailed\x1b[0m in building the engine binary")
 	}
 
-	fmt.Printf("\nInstalled engine \x1b[92m%s-%s\x1b[0m.\n", repo.Engine.Name, version.Name)
+	// Hardlink the engine binary to the latest installation.
+	_ = os.Remove(engine_binary)
+	_ = os.Link(version_binary, engine_binary)
+
+	fmt.Printf("\nInstalled engine \x1b[92m%s %s\x1b[0m.\n", repo.Engine.Name, version.Name)
 	return nil
 }
 
