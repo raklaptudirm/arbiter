@@ -16,6 +16,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -23,7 +24,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 
-	"laptudirm.com/x/arbiter/pkg/data"
+	"laptudirm.com/x/arbiter/pkg/common"
 )
 
 type Engine struct {
@@ -33,7 +34,7 @@ type Engine struct {
 
 	SourceURL string
 
-	Info *data.EngineInfo
+	Info *arbiter.EngineInfo
 }
 
 func NewEngine(ident string) (*Engine, error) {
@@ -51,7 +52,7 @@ func NewEngine(ident string) (*Engine, error) {
 	switch strings.Count(source, "/") {
 	case 0:
 		// Arbiter-core Player: <engine-name>
-		if info, found := data.Engines[source]; found {
+		if info, found := arbiter.Engines[source]; found {
 			engine.Info = &info
 			engine.Author = info.Author
 			engine.SourceURL = info.Source
@@ -160,4 +161,17 @@ func (repo *Repository) Stable() (*plumbing.Reference, error) {
 	}
 
 	return stable, nil
+}
+
+func (engine *Engine) Binary() string {
+	return filepath.Join(arbiter.BinaryDirectory, engine.Name)
+}
+
+func (engine *Engine) VersionBinary(version Version) string {
+	return engine.Binary() + "-" + version.Name
+}
+
+func (engine *Engine) Installed(version Version) bool {
+	_, err := os.Stat(engine.VersionBinary(version))
+	return err == nil
 }

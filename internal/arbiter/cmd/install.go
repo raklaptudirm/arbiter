@@ -1,15 +1,19 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
+	arbiter "laptudirm.com/x/arbiter/pkg/common"
 	"laptudirm.com/x/arbiter/pkg/manager"
 )
 
 // arbiter install
 func Install() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "install { engine owner/engine git-url }",
 		Short: "Install the given Game Player",
 		Args:  cobra.ExactArgs(1),
@@ -27,12 +31,50 @@ func Install() *cobra.Command {
 			need to add the directory ~/arbiter to your path variable.`),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repo, err := manager.NewBareRepository(args[0])
+			engine, err := manager.NewEngine(args[0])
 			if err != nil {
 				return err
 			}
 
-			return repo.InstallEngine()
+			repo, err := manager.NewBareRepository(engine)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("\x1b[32mInstalling Player:\x1b[0m %s by %s\n\n", repo.Engine.Name, repo.Engine.Author)
+
+			if err := repo.Fetch(); err != nil {
+				return err
+			}
+
+			version, err := repo.NewVersion(engine.Version)
+			if err != nil {
+				return err
+			}
+
+			// Re-install the version only if it hasn't been installed previously.
+			if !cmd.Flag("force").Changed && engine.Installed(version) {
+				fmt.Printf("\nEngine \x1b[32m%s %s\x1b[0m is already installed.\n", engine.Name, version.Name)
+			} else {
+				if err := repo.InstallEngine(version); err != nil {
+					return err
+				}
+			}
+
+			// Hardlink the engine binary to the latest installation.
+			_ = os.Remove(engine.Binary())
+			_ = os.Link(engine.VersionBinary(version), engine.Binary())
+
+			// Replace the main engine executable with the newly installed version.
+			if !cmd.Flag("no-main").Changed {
+				arbiter.Engines.SetMainVersion(engine.Name, version.Name)
+			}
+			return nil
 		},
 	}
+
+	cmd.Flags().BoolP("force", "f", false, "Force a re-installation of the engine")
+	cmd.Flags().BoolP("no-main", "n", false, "Don't replace the engine with the new version")
+
+	return cmd
 }

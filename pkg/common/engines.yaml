@@ -1,0 +1,49 @@
+# The Engine Configuration and Records file for Arbiter.
+# The top level data structure is a map which maps an engine's name
+# to its information. The information structure supports five fields:
+#
+# # Required Fields
+# author: string # Author of the Engine
+# source: string # URL of the Engine's repository
+#
+# # Optional Fields
+# build-script: string # Script used to build the Engine's binary
+#
+# # Fields managed by Arbiter (don't edit)
+# versions: []string # Versions of the Engine that are installed
+#
+# Normal users of Arbiter DO NOT need to edit this file, since Arbiter manages
+# this by itself. Edit this file ONLY IF you know what you are doing.
+
+# ================================= #
+# Arbiter Core Engines: DO NOT EDIT #
+# ================================= #
+
+Mess:
+  author: Rak Laptudirm
+  source: https://github.com/raklaptudirm/mess
+
+Ethereal:
+  author: Andrew Grant
+  source: https://github.com/AndyGrant/Ethereal
+
+Stockfish:
+  author: the Stockfish Authors
+  source: https://github.com/official-stockfish/stockfish
+
+  build-script: |
+    cd src
+    make -j profile-build
+    mv ./stockfish ../engine-binary
+
+Zataxx:
+  author: zzzzz
+  source: https://github.com/zzzzz151/Zataxx
+
+  build-script: |
+    cargo build --release
+    mv ./target/release/zataxx ./engine-binary
+
+# ============================================== #
+# User Configured Engines: Add your engines here #
+# ============================================== #

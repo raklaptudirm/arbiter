@@ -45,6 +45,7 @@ func Root() *cobra.Command {
 	root.Version = versionStr
 
 	// Register the various commands.
+	root.AddCommand(Engines())
 	root.AddCommand(Install())
 	root.AddCommand(Completion())
 

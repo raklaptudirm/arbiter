@@ -11,15 +11,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package arbiter
 
 import (
+	_ "embed"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
 )
 
+const Permissions = 0755
+
+//go:embed engines.yaml
+var BaseEngineFile []byte
+
 var (
-	BinaryDirectory string = filepath.Join(xdg.Home, "arbiter", "bin")
-	SourceDirectory string = filepath.Join(xdg.Home, "arbiter", "src")
+	ArbiterDirectory string = filepath.Join(xdg.Home, "arbiter")
+
+	BinaryDirectory string = filepath.Join(ArbiterDirectory, "bin")
+	SourceDirectory string = filepath.Join(ArbiterDirectory, "src")
+
+	EnginesFile string = filepath.Join(ArbiterDirectory, "engines.yaml")
 )

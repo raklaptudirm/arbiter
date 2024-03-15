@@ -27,6 +27,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/sirupsen/logrus"
 
+	"laptudirm.com/x/arbiter/pkg/common"
 	"laptudirm.com/x/arbiter/pkg/internal/util"
 )
 
@@ -42,15 +43,11 @@ type Repository struct {
 	*git.Worktree
 }
 
-func NewBareRepository(engine_ident string) (*Repository, error) {
-	var err error
-
+func NewBareRepository(engine *Engine) (*Repository, error) {
 	var repo Repository
-	if repo.Engine, err = NewEngine(engine_ident); err != nil {
-		return nil, err
-	}
+	repo.Engine = engine
 
-	repo.Path = filepath.Join(util.SourceDirectory, strings.ToLower(repo.Engine.Name))
+	repo.Path = filepath.Join(arbiter.SourceDirectory, strings.ToLower(repo.Engine.Name))
 
 	if repo.Engine.Info != nil {
 		repo.BuildScript = repo.Engine.Info.BuildScript
@@ -59,38 +56,12 @@ func NewBareRepository(engine_ident string) (*Repository, error) {
 	return &repo, nil
 }
 
-func (repo *Repository) InstallEngine() error {
-	var err error
-	logrus.WithField("engine", repo.Engine.Name).Debug("Installing Engine")
-
-	fmt.Printf("\x1b[92mInstalling Player:\x1b[0m %s by %s\n\n", repo.Engine.Name, repo.Engine.Author)
-
-	if repo.Repository == nil {
-		logrus.Debug("Fetching repository into a local path...")
-		if err := repo.Fetch(); err != nil {
-			return err
-		}
-	}
-
-	logrus.Debug("Getting engine version to install...")
-
-	version, err := repo.NewVersion(repo.Engine.Version)
-	if err != nil {
-		return err
-	}
-
+func (repo *Repository) InstallEngine(version Version) error {
 	if err := repo.Build(version); err != nil {
 		return err
 	}
 
-	// Check if the binary directory exists, build it if not.
-	if _, err := os.Stat(util.BinaryDirectory); errors.Is(err, fs.ErrNotExist) {
-		if err := os.Mkdir(util.BinaryDirectory, 0755); err != nil {
-			return err
-		}
-	}
-
-	engine_binary := filepath.Join(util.BinaryDirectory, strings.ToLower(repo.Engine.Name))
+	engine_binary := filepath.Join(arbiter.BinaryDirectory, strings.ToLower(repo.Engine.Name))
 	version_binary := engine_binary + "-" + version.Name
 
 	// Move the engine binary to the binary directory.
@@ -98,9 +69,11 @@ func (repo *Repository) InstallEngine() error {
 		return errors.New("Installer \x1b[31mfailed\x1b[0m in building the engine binary")
 	}
 
-	// Hardlink the engine binary to the latest installation.
-	_ = os.Remove(engine_binary)
-	_ = os.Link(version_binary, engine_binary)
+	// Register the engine and the new version if they previously weren't.
+	if !repo.Engine.Installed(version) {
+		arbiter.Engines.TryAddEngine(repo.Engine.Name, repo.Engine.Author, repo.Engine.SourceURL)
+		arbiter.Engines.InstallVersion(repo.Engine.Name, version.Name)
+	}
 
 	fmt.Printf("\nInstalled engine \x1b[92m%s %s\x1b[0m.\n", repo.Engine.Name, version.Name)
 	return nil
@@ -260,62 +233,3 @@ func (repo *Repository) Fetch() error {
 
 	return err
 }
-
-//func (repo *Repository) ResolveVersion(version string) (plumbing.Hash, error) {
-//	switch version {
-//	// Find the latest stable(tagged) version of the engine.
-//	case "stable":
-//		var stable *plumbing.Reference
-//		var stable_date time.Time
-//
-//		logrus.Debug("Looking for the latest stable release...")
-//		tags, err := repo.Tags()
-//		if err != nil {
-//			goto fallback
-//		}
-//
-//		err = tags.ForEach(func(tag_ref *plumbing.Reference) error {
-//			revision := plumbing.Revision(tag_ref.Name().String())
-//			commit_hash, err := repo.ResolveRevision(revision)
-//			if err != nil {
-//				return err
-//			}
-//
-//			commit, err := repo.CommitObject(*commit_hash)
-//			if err != nil {
-//				return err
-//			}
-//
-//			logrus.WithFields(logrus.Fields{
-//				"commit": commit.Hash.String()[0:7], "time": commit.Committer.When,
-//			}).Debug("Checking tag for time")
-//
-//			if stable == nil || commit.Committer.When.After(stable_date) {
-//				stable = tag_ref
-//				stable_date = commit.Committer.When
-//			}
-//			return nil
-//		})
-//
-//		if stable != nil && err == nil {
-//			return stable.Hash(), err
-//		}
-//
-//		// Some error encountered while looking for latest stable version.
-//		// Fallback to finding the latest development version of the engine.
-//	fallback:
-//		fallthrough
-//
-//	// Find the latest development version of the engine.
-//	case "latest":
-//		latest, err := repo.Head()
-//		return latest.Hash(), err
-//
-//	// Find the version corresponding to the given tag.
-//	default:
-//		tag, err := repo.Tag(repo.Engine.Version)
-//		return tag.Hash(), err
-//	}
-//
-//	panic("reached unreachable statement")
-//}
