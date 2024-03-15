@@ -20,11 +20,18 @@ import (
 )
 
 var global_spinner = spinner.New(spinner.CharSets[31], 100*time.Millisecond)
+var spinning = false
 
 func StartSpinner() {
-	global_spinner.Start()
+	if !spinning {
+		spinning = true
+		global_spinner.Start()
+	}
 }
 
 func PauseSpinner() {
-	global_spinner.Stop()
+	if spinning {
+		spinning = false
+		global_spinner.Stop()
+	}
 }
