@@ -162,52 +162,49 @@ func script_build(build_script string) error {
 	return nil
 }
 
-func (engine *Engine) Fetch() error {
+func (engine *Engine) EfficientFetch() error {
 	var err error
 
-	// If the engine has been cloned previously, just pull any new changes.
-	if engine.Repository, err = git.PlainOpen(engine.Path); err == nil {
-		logrus.Info("Pulling from the Player's source engine...")
-		util.StartSpinner()
+	logrus.Info("Fetching available tags for the engine...")
+	util.StartSpinner()
+	defer util.PauseSpinner()
 
+	// Check if we already have a repository for this engine.
+	logrus.Debug("Trying to open an existing repository...")
+	if engine.Repository, err = git.PlainOpen(engine.Path); err == nil {
 		if engine.Worktree, err = engine.Repository.Worktree(); err == nil {
-			// Try and pull latest changes to the engine from engine source.
-			err := engine.Pull(&git.PullOptions{
-				// This option is necessary to ensure some other repository isn't
-				// cloned instead of the current engine in its repository directory.
+			err = engine.Pull(&git.PullOptions{
 				RemoteURL: engine.SourceURL,
 			})
-
-			util.PauseSpinner()
-
-			// If there are no errors, or the branch is already upto date, return.
 			if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
-				return nil
+				goto fetch
 			}
-
-			logrus.Debug(err)
 		}
 
-		util.PauseSpinner()
-
-		// Fallback to cloning since the current engine is unusable.
-		logrus.Error("Pulling engine failed, making a fresh clone")
+		_ = os.RemoveAll(engine.Path)
 	}
 
-	// Remove any existing stuff in the path.
-	_ = os.RemoveAll(engine.Path)
+	logrus.Debug("Trying to clone the engine to a new repository...")
+	if engine.Repository, err = git.PlainClone(engine.Path, false, &git.CloneOptions{
+		URL: engine.SourceURL, Depth: 1, SingleBranch: true,
+	}); err == nil {
+		if engine.Worktree, err = engine.Repository.Worktree(); err == nil {
+			goto fetch
+		}
+	}
 
-	// If the engine hasn't been cloned previously or is corrupted, clone it.
-	logrus.Info("Fetching the Player's source engine...")
+	return err
 
-	util.StartSpinner()
-	engine.Repository, err = git.PlainClone(engine.Path, false, &git.CloneOptions{
-		URL: engine.SourceURL, SingleBranch: true,
+fetch:
+	logrus.Debug("Fetching tags from repository origin...")
+
+	err = engine.Fetch(&git.FetchOptions{
+		Tags:  git.AllTags,
+		Depth: 1,
 	})
-	util.PauseSpinner()
 
-	if err == nil {
-		engine.Worktree, err = engine.Repository.Worktree()
+	if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return nil
 	}
 
 	return err

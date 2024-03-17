@@ -44,7 +44,7 @@ func Install() *cobra.Command {
 
 			fmt.Printf("\x1b[32mInstalling Player:\x1b[0m %s by %s\n\n", engine.Name, engine.Author)
 
-			if err := engine.Fetch(); err != nil {
+			if err := engine.EfficientFetch(); err != nil {
 				return err
 			}
 
