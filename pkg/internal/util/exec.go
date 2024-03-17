@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func Execute(errStr, command string, args ...string) error {
+func Execute(dir, errStr, command string, args ...string) error {
 	logrus.Debugf("\x1b[34m%s\x1b[0m %s\n", command, strings.Join(args, " "))
 	cmd := exec.Command(command, args...)
 
@@ -34,6 +34,8 @@ func Execute(errStr, command string, args ...string) error {
 
 	cmd.Stdout = ow
 	cmd.Stderr = ew
+
+	cmd.Dir = dir
 
 	// Show the commands output if logging level is Trace.
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
