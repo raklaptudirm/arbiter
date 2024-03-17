@@ -11,33 +11,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package arbiter
+package manager
 
 import (
-	"errors"
-	"io/fs"
 	"os"
 
 	"gopkg.in/yaml.v2"
+
+	arbiter "laptudirm.com/x/arbiter/pkg/common"
 )
 
 type EngineInfoList map[string]EngineInfo
 
-func (list EngineInfoList) TryAddEngine(name, author, source string) {
-	if _, found := list[name]; !found {
-		list[name] = EngineInfo{
-			Author: author,
-			Source: source,
+func (list EngineInfoList) TryAddEngine(engine *Engine) {
+	if _, found := list[engine.Name]; !found {
+		list[engine.Name] = EngineInfo{
+			Author: engine.Author,
+			Source: engine.URL,
 		}
 	}
 
 	list.Dump()
 }
 
-func (list EngineInfoList) InstallVersion(engine string, version string) {
-	info := list[engine]
+func (list EngineInfoList) AddVersion(engine *Engine, version string) {
+	list.TryAddEngine(engine)
+	info := list[engine.Name]
 	info.Versions = append(info.Versions, version)
-	list[engine] = info
+	list[engine.Name] = info
 	list.Dump()
 }
 
@@ -50,7 +51,7 @@ func (list EngineInfoList) SetMainVersion(engine string, version string) {
 
 func (list EngineInfoList) Dump() {
 	file, _ := yaml.Marshal(list)
-	_ = os.WriteFile(EnginesFile, file, Permissions)
+	_ = os.WriteFile(EnginesFile, file, arbiter.FilePermissions)
 }
 
 type EngineInfo struct {
@@ -66,24 +67,11 @@ type EngineInfo struct {
 var Engines EngineInfoList
 
 func init() {
-	try_mkdir(ArbiterDirectory)
-	try_mkdir(SourceDirectory)
-	try_mkdir(BinaryDirectory)
+	arbiter.TryMkdir(SourceDirectory)
+	arbiter.TryMkdir(BinaryDirectory)
 
-	try_mkfile(EnginesFile, BaseEngineFile)
+	arbiter.TryCreate(EnginesFile, BaseEngineFile)
 
 	file, _ := os.ReadFile(EnginesFile)
 	_ = yaml.Unmarshal(file, &Engines)
-}
-
-func try_mkdir(dir string) {
-	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
-		_ = os.Mkdir(dir, Permissions)
-	}
-}
-
-func try_mkfile(file string, data []byte) {
-	if _, err := os.Stat(file); errors.Is(err, fs.ErrNotExist) {
-		_ = os.WriteFile(file, data, Permissions)
-	}
 }

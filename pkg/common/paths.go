@@ -14,22 +14,30 @@
 package arbiter
 
 import (
-	_ "embed"
+	"errors"
+	"io/fs"
+	"os"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
 )
 
-const Permissions = 0755
+const FilePermissions = 0755
 
-//go:embed engines.yaml
-var BaseEngineFile []byte
+var Directory = filepath.Join(xdg.Home, "arbiter")
 
-var (
-	ArbiterDirectory string = filepath.Join(xdg.Home, "arbiter")
+func TryMkdir(dir string) {
+	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
+		_ = os.Mkdir(dir, FilePermissions)
+	}
+}
 
-	BinaryDirectory string = filepath.Join(ArbiterDirectory, "bin")
-	SourceDirectory string = filepath.Join(ArbiterDirectory, "src")
+func TryCreate(file string, data []byte) {
+	if _, err := os.Stat(file); errors.Is(err, fs.ErrNotExist) {
+		_ = os.WriteFile(file, data, FilePermissions)
+	}
+}
 
-	EnginesFile string = filepath.Join(ArbiterDirectory, "engines.yaml")
-)
+func init() {
+	TryMkdir(Directory)
+}

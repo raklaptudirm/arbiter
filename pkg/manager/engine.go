@@ -14,169 +14,96 @@
 package manager
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
-
-	"laptudirm.com/x/arbiter/pkg/common"
-	"laptudirm.com/x/arbiter/pkg/internal/util"
 )
 
+// Engine represents one of the game-engines managed by arbiter/manager.
+// It contains metadata about the game-engine and its source repository.
 type Engine struct {
+	// Basic Information
 	Name   string
 	Author string
+	Info   *EngineInfo
 
-	SourceURL string
-
-	Info *arbiter.EngineInfo
-
-	Path string
+	// Source Repository Information
+	URL  string // URL of the engine's remote repository
+	Path string // Path to the engine's local repository
 	*git.Repository
 	*git.Worktree
 }
 
-func NewEngine(source string) (*Engine, error) {
-	// <git-engine>[@<version>]
+// NewEngine creates an instance of *manager.Engine from the given engine
+// identifier string. The identifier has to have one of the following formats:
+//
+// 1. <engine-name>                 - Core Engine Format
+// 2. <engine-author>/<engine-name> - GitHub Engine Format
+// 3. <full-source-git-url>         - Git Engine Format
+//
+// Only engines whose configuration are present in arbiter by default or have
+// been previously installed can be identified using the format (1).
+//
+// Only engines whose repositories are hosted on GitHub can be identified by
+// (2). github.com/<engine-author>/<engine-name> has to be the engine source.
+func NewEngine(identifier string) (*Engine, error) {
 	var engine Engine
 
-	engine.Name = filepath.Base(source)
-	engine.Path = filepath.Join(arbiter.SourceDirectory, strings.ToLower(engine.Name))
+	// In all formats, the engine name is the last part of the identifier:
+	// [<stuff-depending-on-the-particular-format>/]<engine-name>
+	engine.Name = filepath.Base(identifier)
 
-	switch strings.Count(source, "/") {
+	// The engine's repository will be stored at ARBITER_SOURCE/<engine-name>.
+	engine.Path = filepath.Join(SourceDirectory, strings.ToLower(engine.Name))
+
+	// The formats can be differentiated between using the number of '/' in
+	// the identifier. (1) has 0, (2) has 1, and (3) has >= 2 '/'s.
+	switch strings.Count(identifier, "/") {
 	case 0:
-		// Arbiter-core Player: <engine-name>
-		if info, found := arbiter.Engines[source]; found {
+		// Format (1): <engine-name>
+		// The engine has to be found in the configuration.
+		if info, found := Engines[identifier]; found {
 			engine.Info = &info
+			engine.URL = info.Source
 			engine.Author = info.Author
-			engine.SourceURL = info.Source
 		} else {
 			return nil, fmt.Errorf("Engine %s not found in arbiter dataset", engine.Name)
 		}
 
 	case 1:
-		// Github Player: <owner>/<engine-name>
-		engine.SourceURL = "https://github.com/" + source
-		engine.Author, _, _ = strings.Cut(source, "/")
+		// Format (2): <engine-author>/<engine-name>
+		engine.URL = "https://github.com/" + identifier
+		engine.Author, _, _ = strings.Cut(identifier, "/")
 
 	default:
-		// Git Repository Player: <full-git-url>
-		engine.SourceURL = source
-		engine.Author = filepath.Base(filepath.Dir(source))
+		// Format (3): <full-source-git-url>
+		engine.URL = identifier
+		engine.Author = filepath.Base(filepath.Dir(identifier))
 	}
 
+	// Debug logging: Engine's Details
 	logrus.WithFields(logrus.Fields{
-		"name":   engine.Name,
-		"author": engine.Author,
-		"source": engine.SourceURL,
+		"name":       engine.Name,
+		"author":     engine.Author,
+		"identifier": engine.URL,
 	}).Debug("Figured out basic engine details")
 
 	return &engine, nil
 }
 
-type Version struct {
-	Name string
-	Ref  *plumbing.Reference
-}
-
-func (engine *Engine) ResolveVersion(v string) (Version, error) {
-	var version Version
-	switch v {
-	// Find the latest stable(tagged) version of the engine.
-	case "stable":
-		stable, err := engine.FindStable()
-		if err != nil {
-			return version, err
-		}
-
-		version.Name = stable.Name().Short()
-		version.Ref = stable
-
-	// Find the latest development version of the engine.
-	case "latest":
-		latest, err := engine.Head()
-		if err != nil {
-			return version, errors.New("Unable to find version \x1b[31mstable\x1b[0m")
-		}
-
-		version.Name = latest.Hash().String()[0:7]
-		version.Ref = latest
-
-	// Find the version corresponding to the given tag.
-	default:
-		tag, err := engine.FindTag(v)
-		if err != nil {
-			return version, err
-		}
-
-		version.Name = tag.Name().Short()
-		version.Ref = tag
-	}
-
-	return version, nil
-}
-
-func (engine *Engine) FindTag(tag string) (*plumbing.Reference, error) {
-	remote, err := engine.Remote(git.DefaultRemoteName)
-	if err != nil {
-		return nil, err
-	}
-
-	refs, err := remote.List(&git.ListOptions{PeelingOption: git.AppendPeeled})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, ref := range refs {
-		if ref.Name().IsTag() && ref.Name().Short() == tag {
-			return ref, nil
-		}
-	}
-
-	return nil, fmt.Errorf("Unable to find version \x1b[31m%s\x1b[0m", tag)
-}
-
-func (engine *Engine) FindStable() (*plumbing.Reference, error) {
-	logrus.Debug("Looking for the latest stable release...")
-
-	remote, err := engine.Remote(git.DefaultRemoteName)
-	if err != nil {
-		return nil, err
-	}
-
-	refs, err := remote.List(&git.ListOptions{PeelingOption: git.AppendPeeled})
-	if err != nil {
-		return nil, err
-	}
-
-	var stable *plumbing.Reference
-	for _, ref := range refs {
-		if ref.Name().IsTag() && (stable == nil || util.AlphanumCompare(stable.Name().Short(), ref.Name().Short())) {
-			stable = ref
-		}
-	}
-
-	if stable == nil || err != nil {
-		return nil, errors.New("Unable to find version \x1b[31mstable\x1b[0m")
-	}
-
-	return stable, nil
-}
-
 func (engine *Engine) Binary() string {
-	return filepath.Join(arbiter.BinaryDirectory, engine.Name)
+	return filepath.Join(BinaryDirectory, engine.Name)
 }
 
 func (engine *Engine) VersionBinary(version Version) string {
 	return engine.Binary() + "-" + version.Name
 }
 
-func (engine *Engine) Installed(version Version) bool {
+func (engine *Engine) Downloaded(version Version) bool {
 	_, err := os.Stat(engine.VersionBinary(version))
 	return err == nil
 }

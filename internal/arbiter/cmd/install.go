@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	arbiter "laptudirm.com/x/arbiter/pkg/common"
 	"laptudirm.com/x/arbiter/pkg/manager"
 )
 
@@ -45,7 +44,7 @@ func Install() *cobra.Command {
 
 			fmt.Printf("\x1b[32mInstalling Player:\x1b[0m %s by %s\n\n", engine.Name, engine.Author)
 
-			if err := engine.EfficientFetch(); err != nil {
+			if err := engine.FetchRepository(); err != nil {
 				return err
 			}
 
@@ -57,10 +56,10 @@ func Install() *cobra.Command {
 			logrus.Infof("Installing engine version \x1b[32m%s\x1b[0m\n", version.Name)
 
 			// Re-install the version only if it hasn't been installed previously.
-			if !cmd.Flag("force").Changed && engine.Installed(version) {
+			if !cmd.Flag("force").Changed && engine.Downloaded(version) {
 				fmt.Printf("\nEngine \x1b[32m%s %s\x1b[0m is already installed.\n", engine.Name, version.Name)
 			} else {
-				if err := engine.InstallEngine(version); err != nil {
+				if err := engine.Download(version); err != nil {
 					return err
 				}
 			}
@@ -71,7 +70,7 @@ func Install() *cobra.Command {
 
 			// Replace the main engine executable with the newly installed version.
 			if !cmd.Flag("no-main").Changed {
-				arbiter.Engines.SetMainVersion(engine.Name, version.Name)
+				manager.Engines.SetMainVersion(engine.Name, version.Name)
 			}
 			return nil
 		},

@@ -18,7 +18,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	arbiter "laptudirm.com/x/arbiter/pkg/common"
+	arbiter "laptudirm.com/x/arbiter/pkg/manager"
 )
 
 func Engines() *cobra.Command {
@@ -55,7 +55,7 @@ func Engines() *cobra.Command {
 			}
 
 			if !found_engine {
-				fmt.Println("\x1b[31mNo Engines Installed.\x1b[0m")
+				fmt.Println("\x1b[31mNo Engines Downloaded.\x1b[0m")
 				return nil
 			}
 
