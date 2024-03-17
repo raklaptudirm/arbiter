@@ -89,7 +89,7 @@ func (engine *Engine) ResolveVersion(v string) (Version, error) {
 	switch v {
 	// Find the latest stable(tagged) version of the engine.
 	case "stable":
-		stable, err := engine.Stable()
+		stable, err := engine.FindStable()
 		if err != nil {
 			return version, err
 		}
@@ -109,9 +109,9 @@ func (engine *Engine) ResolveVersion(v string) (Version, error) {
 
 	// Find the version corresponding to the given tag.
 	default:
-		tag, err := engine.Tag(v)
+		tag, err := engine.FindTag(v)
 		if err != nil {
-			return version, fmt.Errorf("Unable to find version \x1b[31m%s\x1b[0m", v)
+			return version, err
 		}
 
 		version.Name = tag.Name().Short()
@@ -121,10 +121,30 @@ func (engine *Engine) ResolveVersion(v string) (Version, error) {
 	return version, nil
 }
 
-func (engine *Engine) Stable() (*plumbing.Reference, error) {
+func (engine *Engine) FindTag(tag string) (*plumbing.Reference, error) {
+	remote, err := engine.Remote(git.DefaultRemoteName)
+	if err != nil {
+		return nil, err
+	}
+
+	refs, err := remote.List(&git.ListOptions{PeelingOption: git.AppendPeeled})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ref := range refs {
+		if ref.Name().IsTag() && ref.Name().Short() == tag {
+			return ref, nil
+		}
+	}
+
+	return nil, fmt.Errorf("Unable to find version \x1b[31m%s\x1b[0m", tag)
+}
+
+func (engine *Engine) FindStable() (*plumbing.Reference, error) {
 	logrus.Debug("Looking for the latest stable release...")
 
-	remote, err := engine.Remote("origin")
+	remote, err := engine.Remote(git.DefaultRemoteName)
 	if err != nil {
 		return nil, err
 	}
