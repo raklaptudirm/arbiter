@@ -15,7 +15,6 @@ package manager
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -93,17 +92,4 @@ func NewEngine(identifier string) (*Engine, error) {
 	}).Debug("Figured out basic engine details")
 
 	return &engine, nil
-}
-
-func (engine *Engine) Binary() string {
-	return filepath.Join(BinaryDirectory, engine.Name)
-}
-
-func (engine *Engine) VersionBinary(version Version) string {
-	return engine.Binary() + "-" + version.Name
-}
-
-func (engine *Engine) Downloaded(version Version) bool {
-	_, err := os.Stat(engine.VersionBinary(version))
-	return err == nil
 }

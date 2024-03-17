@@ -56,7 +56,7 @@ func Install() *cobra.Command {
 			logrus.Infof("Installing engine version \x1b[32m%s\x1b[0m\n", version.Name)
 
 			// Re-install the version only if it hasn't been installed previously.
-			if !cmd.Flag("force").Changed && engine.Downloaded(version) {
+			if !cmd.Flag("force").Changed && manager.Downloaded(engine, version) {
 				fmt.Printf("\nEngine \x1b[32m%s %s\x1b[0m is already installed.\n", engine.Name, version.Name)
 			} else {
 				if err := engine.Download(version); err != nil {
@@ -64,12 +64,13 @@ func Install() *cobra.Command {
 				}
 			}
 
-			// Hardlink the engine binary to the latest installation.
-			_ = os.Remove(engine.Binary())
-			_ = os.Link(engine.VersionBinary(version), engine.Binary())
-
 			// Replace the main engine executable with the newly installed version.
 			if !cmd.Flag("no-main").Changed {
+				// Hardlink the engine binary to the latest installation.
+				_ = os.Remove(manager.Binary(engine))
+				_ = os.Link(manager.VersionBinary(engine, version), manager.Binary(engine))
+
+				// Update the main version in the registry.
 				manager.Engines.SetMainVersion(engine.Name, version.Name)
 			}
 			return nil
