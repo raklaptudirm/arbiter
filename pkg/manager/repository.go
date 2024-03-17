@@ -25,6 +25,7 @@ import (
 
 	"github.com/briandowns/spinner"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/sirupsen/logrus"
 
 	"laptudirm.com/x/arbiter/pkg/common"
@@ -59,13 +60,17 @@ func (engine *Engine) InstallEngine(version Version) error {
 }
 
 func (engine *Engine) Build(version Version) error {
+	if err := engine.Fetch(version); err != nil {
+		return err
+	}
+
 	// Reset repository state after stuff has been done.
 	head, _ := engine.Head()
 	defer util.Ignore(engine.Checkout(&git.CheckoutOptions{Hash: head.Hash()}))
 	logrus.WithField("target", head.Hash().String()[0:7]).
 		Debug("Repository will be checked back after installation")
 	if err := engine.Checkout(&git.CheckoutOptions{
-		Hash: version.Hash,
+		Hash: version.Ref.Hash(),
 	}); err != nil {
 		return err
 	}
@@ -165,9 +170,11 @@ func script_build(build_script string) error {
 func (engine *Engine) EfficientFetch() error {
 	var err error
 
-	logrus.Info("Fetching available tags for the engine...")
+	logrus.Info("Fetching the engine's source repository...")
 	util.StartSpinner()
 	defer util.PauseSpinner()
+
+	logrus.Debug("Fetching tags from repository origin...")
 
 	// Check if we already have a repository for this engine.
 	logrus.Debug("Trying to open an existing repository...")
@@ -177,7 +184,7 @@ func (engine *Engine) EfficientFetch() error {
 				RemoteURL: engine.SourceURL,
 			})
 			if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
-				goto fetch
+				return nil
 			}
 		}
 
@@ -186,26 +193,32 @@ func (engine *Engine) EfficientFetch() error {
 
 	logrus.Debug("Trying to clone the engine to a new repository...")
 	if engine.Repository, err = git.PlainClone(engine.Path, false, &git.CloneOptions{
-		URL: engine.SourceURL, Depth: 1, SingleBranch: true,
+		URL:   engine.SourceURL,
+		Depth: 1, SingleBranch: true, Tags: git.NoTags,
+		Progress: os.Stdout,
 	}); err == nil {
-		if engine.Worktree, err = engine.Repository.Worktree(); err == nil {
-			goto fetch
+		engine.Worktree, err = engine.Repository.Worktree()
+	}
+
+	return err
+}
+
+func (engine *Engine) Fetch(version Version) error {
+	name := version.Ref.Name()
+	if name.IsTag() {
+		logrus.WithField("refspec", name.String()+":"+name.String()).Debug("Fetching required tag")
+		err := engine.Repository.Fetch(&git.FetchOptions{
+			Depth: 1,
+			RefSpecs: []config.RefSpec{
+				config.RefSpec("+" + name.String() + ":" + name.String()),
+			},
+			Progress: os.Stdout,
+		})
+
+		if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return err
 		}
 	}
 
-	return err
-
-fetch:
-	logrus.Debug("Fetching tags from repository origin...")
-
-	err = engine.Fetch(&git.FetchOptions{
-		Tags:  git.AllTags,
-		Depth: 1,
-	})
-
-	if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return nil
-	}
-
-	return err
+	return nil
 }

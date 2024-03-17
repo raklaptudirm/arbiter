@@ -19,13 +19,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 
 	"laptudirm.com/x/arbiter/pkg/common"
+	"laptudirm.com/x/arbiter/pkg/internal/util"
 )
 
 type Engine struct {
@@ -46,7 +46,6 @@ func NewEngine(source string) (*Engine, error) {
 	var engine Engine
 
 	engine.Name = filepath.Base(source)
-
 	engine.Path = filepath.Join(arbiter.SourceDirectory, strings.ToLower(engine.Name))
 
 	switch strings.Count(source, "/") {
@@ -75,14 +74,14 @@ func NewEngine(source string) (*Engine, error) {
 		"name":   engine.Name,
 		"author": engine.Author,
 		"source": engine.SourceURL,
-	}).Debug("Created new manager.Engine")
+	}).Debug("Figured out basic engine details")
 
 	return &engine, nil
 }
 
 type Version struct {
 	Name string
-	Hash plumbing.Hash
+	Ref  *plumbing.Reference
 }
 
 func (engine *Engine) ResolveVersion(v string) (Version, error) {
@@ -96,7 +95,7 @@ func (engine *Engine) ResolveVersion(v string) (Version, error) {
 		}
 
 		version.Name = stable.Name().Short()
-		version.Hash = stable.Hash()
+		version.Ref = stable
 
 	// Find the latest development version of the engine.
 	case "latest":
@@ -106,7 +105,7 @@ func (engine *Engine) ResolveVersion(v string) (Version, error) {
 		}
 
 		version.Name = latest.Hash().String()[0:7]
-		version.Hash = latest.Hash()
+		version.Ref = latest
 
 	// Find the version corresponding to the given tag.
 	default:
@@ -116,44 +115,31 @@ func (engine *Engine) ResolveVersion(v string) (Version, error) {
 		}
 
 		version.Name = tag.Name().Short()
-		version.Hash = tag.Hash()
+		version.Ref = tag
 	}
 
 	return version, nil
 }
 
 func (engine *Engine) Stable() (*plumbing.Reference, error) {
-	var stable *plumbing.Reference
-	var stable_date time.Time
-
 	logrus.Debug("Looking for the latest stable release...")
-	tags, err := engine.Tags()
+
+	remote, err := engine.Remote("origin")
 	if err != nil {
 		return nil, err
 	}
 
-	err = tags.ForEach(func(tag_ref *plumbing.Reference) error {
-		revision := plumbing.Revision(tag_ref.Name().String())
-		commit_hash, err := engine.ResolveRevision(revision)
-		if err != nil {
-			return err
-		}
+	refs, err := remote.List(&git.ListOptions{PeelingOption: git.AppendPeeled})
+	if err != nil {
+		return nil, err
+	}
 
-		commit, err := engine.CommitObject(*commit_hash)
-		if err != nil {
-			return err
+	var stable *plumbing.Reference
+	for _, ref := range refs {
+		if ref.Name().IsTag() && (stable == nil || util.AlphanumCompare(stable.Name().Short(), ref.Name().Short())) {
+			stable = ref
 		}
-
-		logrus.WithFields(logrus.Fields{
-			"commit": commit.Hash.String()[0:7], "time": commit.Committer.When,
-		}).Debug("Checking tag for time")
-
-		if stable == nil || commit.Committer.When.After(stable_date) {
-			stable = tag_ref
-			stable_date = commit.Committer.When
-		}
-		return nil
-	})
+	}
 
 	if stable == nil || err != nil {
 		return nil, errors.New("Unable to find version \x1b[31mstable\x1b[0m")
