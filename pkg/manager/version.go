@@ -90,7 +90,7 @@ func (engine *Engine) FindStable() (*plumbing.Reference, error) {
 		// https://web.archive.org/web/20210803201519/http://www.davekoelle.com/alphanum.html
 		if ref.Name().IsTag() {
 			// Replace the current reference if it or it is an older tag, or it is nil.
-			if util.AlphanumCompare(stable.Name().Short(), ref.Name().Short()) || stable == nil {
+			if stable == nil || util.AlphanumCompare(stable.Name().Short(), ref.Name().Short()) {
 				stable = ref
 			}
 		}
