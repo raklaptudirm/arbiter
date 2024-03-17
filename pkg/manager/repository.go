@@ -191,7 +191,10 @@ func (engine *Engine) EfficientFetch() error {
 		_ = os.RemoveAll(engine.Path)
 	}
 
+	util.PauseSpinner()
+
 	logrus.Debug("Trying to clone the engine to a new repository...")
+	fmt.Printf("\x1b[33m")
 	if engine.Repository, err = git.PlainClone(engine.Path, false, &git.CloneOptions{
 		URL:   engine.SourceURL,
 		Depth: 1, SingleBranch: true, Tags: git.NoTags,
@@ -199,6 +202,7 @@ func (engine *Engine) EfficientFetch() error {
 	}); err == nil {
 		engine.Worktree, err = engine.Repository.Worktree()
 	}
+	fmt.Printf("\x1b[0m")
 
 	return err
 }
@@ -207,6 +211,7 @@ func (engine *Engine) Fetch(version Version) error {
 	name := version.Ref.Name()
 	if name.IsTag() {
 		logrus.WithField("refspec", name.String()+":"+name.String()).Debug("Fetching required tag")
+		fmt.Printf("\x1b[33m")
 		err := engine.Repository.Fetch(&git.FetchOptions{
 			Depth: 1,
 			RefSpecs: []config.RefSpec{
@@ -214,6 +219,7 @@ func (engine *Engine) Fetch(version Version) error {
 			},
 			Progress: os.Stdout,
 		})
+		fmt.Printf("\x1b[0m")
 
 		if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
 			return err
