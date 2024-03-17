@@ -19,5 +19,5 @@ command-line tool with interactive prompts to enable easy configuration.
 **Requirements:** [Go 1.20 or greater](https://go.dev/doc/install)
 
 ```go
-go install laptudirm.com/x/arbiter@latest
+go install laptudirm.com/x/arbiter/cmd/arbiter@latest
 ```
