@@ -24,8 +24,15 @@ import (
 var BaseEngineFile []byte
 
 var (
+	// BinaryDirectory is the path to the directory where the manager
+	// stores all the binaries of downloaded and installed Engines.
 	BinaryDirectory = filepath.Join(arbiter.Directory, "bin")
+
+	// SourceDirectory is the path to the directory where the manager
+	// stores all the source repositories of downloaded Engines.
 	SourceDirectory = filepath.Join(arbiter.Directory, "src")
 
+	// EnginesFile is the path to the lockfile used by the manager
+	// to keep track of what Engines and Versions are available.
 	EnginesFile = filepath.Join(arbiter.Directory, "engines.yaml")
 )
