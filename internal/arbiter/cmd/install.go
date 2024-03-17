@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	arbiter "laptudirm.com/x/arbiter/pkg/common"
@@ -52,6 +53,8 @@ func Install() *cobra.Command {
 			if err != nil {
 				return err
 			}
+
+			logrus.Infof("Installing engine version \x1b[32m%s\x1b[0m\n", version.Name)
 
 			// Re-install the version only if it hasn't been installed previously.
 			if !cmd.Flag("force").Changed && engine.Installed(version) {
