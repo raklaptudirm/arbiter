@@ -25,44 +25,42 @@ import (
 	"laptudirm.com/x/arbiter/pkg/internal/util"
 )
 
-func (engine *Engine) FetchRepository() error {
-	var err error
-
+// FetchRepository fetches the given remote repository into the given path. If
+// the repository was previously cloned, it tries to get it up to date with the
+// remote repository.
+func FetchRepository(url, path string) (*git.Repository, error) {
 	logrus.Info("Fetching the engine's source repository...")
 	util.StartSpinner()
 	defer util.PauseSpinner()
 
-	logrus.Debug("Fetching tags from repository origin...")
-
 	// Check if we already have a repository for this engine.
 	logrus.Debug("Trying to open an existing repository...")
-	if engine.Repository, err = git.PlainOpen(engine.Path); err == nil {
-		if engine.Worktree, err = engine.Repository.Worktree(); err == nil {
-			err = engine.Pull(&git.PullOptions{
-				RemoteURL: engine.URL,
+	if repository, err := git.PlainOpen(path); err == nil {
+		if worktree, err := repository.Worktree(); err == nil {
+			// Pull any changes made to the remote repository.
+			err = worktree.Pull(&git.PullOptions{
+				RemoteURL: url,
 			})
 			if err == nil || errors.Is(err, git.NoErrAlreadyUpToDate) {
-				return nil
+				return repository, nil
 			}
 		}
 
-		_ = os.RemoveAll(engine.Path)
+		_ = os.RemoveAll(path)
 	}
 
 	util.PauseSpinner()
 
+	// Repository wasn't previously cloned or is corrupt, so clone from scratch.
+
 	logrus.Debug("Trying to clone the engine to a new repository...")
 	fmt.Printf("\x1b[33m")
-	if engine.Repository, err = git.PlainClone(engine.Path, false, &git.CloneOptions{
-		URL:   engine.URL,
+	defer fmt.Printf("\x1b[0m")
+	return git.PlainClone(path, false, &git.CloneOptions{
+		URL:   url,
 		Depth: 1, SingleBranch: true, Tags: git.NoTags,
 		Progress: os.Stdout,
-	}); err == nil {
-		engine.Worktree, err = engine.Repository.Worktree()
-	}
-	fmt.Printf("\x1b[0m")
-
-	return err
+	})
 }
 
 func (engine *Engine) FetchVersion(version Version) error {

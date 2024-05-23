@@ -46,10 +46,6 @@ func Install() *cobra.Command {
 
 			fmt.Printf("\x1b[32mInstalling Engine:\x1b[0m %s by %s\n\n", engine.Name, engine.Author)
 
-			if err := engine.FetchRepository(); err != nil {
-				return err
-			}
-
 			version, err := engine.ResolveVersion(tag)
 			if err != nil {
 				return err

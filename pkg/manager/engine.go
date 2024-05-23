@@ -49,6 +49,8 @@ type Engine struct {
 //
 // Only engines whose repositories are hosted on GitHub can be identified by
 // (2). github.com/<engine-author>/<engine-name> has to be the engine source.
+// The engine's repository is also fetched and cached locally after the engine's
+// details has been resolved.
 func NewEngine(identifier string) (*Engine, error) {
 	var engine Engine
 
@@ -90,6 +92,16 @@ func NewEngine(identifier string) (*Engine, error) {
 		"author":     engine.Author,
 		"identifier": engine.URL,
 	}).Debug("Figured out basic engine details")
+
+	var err error
+
+	// Fetch the engine repository and worktree.
+	if engine.Repository, err = FetchRepository(engine.URL, engine.Path); err != nil {
+		return nil, err
+	}
+	if engine.Worktree, err = engine.Repository.Worktree(); err != nil {
+		return nil, err
+	}
 
 	return &engine, nil
 }
