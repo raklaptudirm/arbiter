@@ -16,10 +16,11 @@ import (
 func Install() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install { engine owner/engine git-url }",
-		Short: "Install the given Game Player",
+		Short: "Install the given engine",
 		Args:  cobra.ExactArgs(1),
 
-		Long: heredoc.Doc(`install installs the given engine into arbiter so that it
+		Long: heredoc.Doc(
+			`install installs the given engine into arbiter so that it
 			can be used globally and in arbiter without configuration
 			and sourcing the engine every time it is used.
 
@@ -29,7 +30,8 @@ func Install() *cobra.Command {
 			the engines arbiter is configured by default for.
 
 			To use the installed engines from the command line, you will
-			need to add the directory ~/arbiter to your path variable.`),
+			need to add the directory ~/arbiter to your path variable.`,
+		),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			source, tag, has_tag := strings.Cut(args[0], "@")
@@ -42,7 +44,7 @@ func Install() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("\x1b[32mInstalling Player:\x1b[0m %s by %s\n\n", engine.Name, engine.Author)
+			fmt.Printf("\x1b[32mInstalling Engine:\x1b[0m %s by %s\n\n", engine.Name, engine.Author)
 
 			if err := engine.FetchRepository(); err != nil {
 				return err

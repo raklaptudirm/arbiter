@@ -87,8 +87,8 @@ type EngineInfo struct {
 
 	// Installation Stuff
 	Current     string   `yaml:"current"`
-	Versions    []string `yaml:"versions,omitempty"`
 	BuildScript string   `yaml:"build-script,omitempty"`
+	Versions    []string `yaml:"versions,omitempty"`
 }
 
 // Engines is the main EngineInfoList used by the manager.

@@ -9,15 +9,9 @@
 # # Optional Fields
 # build-script: string # Script used to build the Engine's binary
 #
-# # Fields managed by Arbiter (don't edit)
+# # Fields managed by Arbiter (don't add/edit)
 # versions: []string # Versions of the Engine that are installed
 #
-# Normal users of Arbiter DO NOT need to edit this file, since Arbiter manages
-# this by itself. Edit this file ONLY IF you know what you are doing.
-
-# ================================= #
-# Arbiter Core Engines: DO NOT EDIT #
-# ================================= #
 
 Mess:
   author: Rak Laptudirm
@@ -43,7 +37,3 @@ Zataxx:
   build-script: |
     cargo build --release
     mv ./target/release/zataxx ./engine-binary
-
-# ============================================== #
-# User Configured Engines: Add your engines here #
-# ============================================== #

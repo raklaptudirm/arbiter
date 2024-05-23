@@ -37,7 +37,8 @@ func Engines() *cobra.Command {
 
 				if !found_engine {
 					found_engine = true
-					fmt.Println("\u001B[32mInstalled Engines\u001B[0m:\n")
+					fmt.Println("\u001B[32mInstalled Engines\u001B[0m:")
+					fmt.Println()
 				}
 
 				versions := ""
