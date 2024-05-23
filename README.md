@@ -18,6 +18,7 @@ command-line tool with interactive prompts to enable easy configuration.
 
 **Requirements:** [Go 1.20 or greater](https://go.dev/doc/install)
 
-```go
+```sh
 go install laptudirm.com/x/arbiter/cmd/arbiter@latest
+# add ~/arbiter/bin to your PATH to make the installed engines available globally
 ```
