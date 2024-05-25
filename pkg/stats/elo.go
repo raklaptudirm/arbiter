@@ -25,16 +25,16 @@ func SPRT(ws, ds, ls float64, elo0, elo1 float64) (llr float64) {
     	ds += 0.5
     	ls += 0.5
 	
-	N := float64(ws + ds + ls) // total number of games
-	_, dlo := wdlToElo(float64(ws)/N, float64(ds)/N, float64(ls)/N)
+	N := ws + ds + ls // total number of games
+	_, dlo := wdlToElo(ws/N, ds/N, ls/N)
 
 	w0, d0, l0 := eloToWDL(elo0, dlo) // elo0 WDL probabilities
 	w1, d1, l1 := eloToWDL(elo1, dlo) // elo1 WDL probabilities
 
 	// log-likelihood ratio (llr)
-	return float64(ws)*math.Log(w1/w0) +
-		float64(ds)*math.Log(d1/d0) +
-		float64(ls)*math.Log(l1/l0)
+	return ws*math.Log(w1/w0) +
+		ds*math.Log(d1/d0) +
+		ls*math.Log(l1/l0)
 }
 
 // Elo returns the likely elo of the target player along with its p < 0.05
