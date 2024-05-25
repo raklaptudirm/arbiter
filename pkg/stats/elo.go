@@ -19,12 +19,12 @@ import "math"
 // number of wins, draws, and losses from the tournament and returns the
 // log-likelihood ratio (llr) for whether elo0 or elo1 is more likely to
 // be correct. It only calculates when at least one of each result is there.
-func SPRT(ws, ds, ls int, elo0, elo1 float64) (llr float64) {
-	if ws == 0 || ds == 0 || ls == 0 {
-		// wait for one of each result before calculating llr
-		return 0
-	}
-
+func SPRT(ws, ds, ls float64, elo0, elo1 float64) (llr float64) {
+	// Implement Dirichlet([0.5, 0.5, 0.5]) prior
+    	ws += 0.5
+    	ds += 0.5
+    	ls += 0.5
+	
 	N := float64(ws + ds + ls) // total number of games
 	_, dlo := wdlToElo(float64(ws)/N, float64(ds)/N, float64(ls)/N)
 
