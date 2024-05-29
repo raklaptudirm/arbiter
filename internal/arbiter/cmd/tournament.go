@@ -14,62 +14,49 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 	"laptudirm.com/x/arbiter/pkg/tournament"
-	"laptudirm.com/x/arbiter/pkg/tournament/games"
-	"laptudirm.com/x/mess/pkg/board/piece"
 )
 
 func Tournament() *cobra.Command {
 	return &cobra.Command{
 		Use:   "tournament details-file",
 		Short: "Run a tournament with different engines",
-		Args:  cobra.ExactArgs(0),
+		Args:  cobra.ExactArgs(1),
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			engine1, err := tournament.NewEngine(tournament.EngineConfig{
-				Name:     "Mess1",
-				Cmd:      "./engines/mexx",
-				Protocol: "uai",
-				Logger:   os.Stdout,
-			})
-
+			file, err := os.ReadFile(args[0])
 			if err != nil {
-				os.Exit(1)
+				return err
 			}
 
-			engine2, err := tournament.NewEngine(tournament.EngineConfig{
-				Name:     "Mess2",
-				Cmd:      "./engines/mexx",
-				Protocol: "uai",
-				Logger:   os.Stdout,
-			})
-
+			var config tournament.Config
+			err = yaml.Unmarshal(file, &config)
 			if err != nil {
-				os.Exit(1)
+				return err
 			}
 
-			game := tournament.Game{
-				StartFEN:  "x5o/7/7/7/7/7/o5x x 0 1",
-				GameEndFn: games.HasAtaxxGameEnded,
-
-				Engines: [piece.ColorN]*tournament.Player{
-					engine1, engine2,
-				},
-
-				TotalTime: [piece.ColorN]time.Duration{
-					8 * time.Second, 8 * time.Second,
-				},
+			tour, err := tournament.NewTournament(config)
+			if err != nil {
+				return err
 			}
 
-			fmt.Println("debug: starting game")
-			fmt.Println(game.Play())
+			return tour.Start()
 
-			return nil
+			// var rr tournament.RoundRobin
+			// rr.Initialize(tour)
+
+			// fmt.Printf("Total games: %d\n", rr.TotalGames())
+
+			// for game_num := 0; game_num < rr.TotalGames(); game_num++ {
+			// 	p1, p2 := rr.NextPair(game_num)
+			// 	fmt.Printf("Game #%d: %d vs %d\n", game_num, p1, p2)
+			// }
+
+			// return nil
 		},
 	}
 }

@@ -13,70 +13,139 @@
 
 package tournament
 
+import (
+	"fmt"
+
+	"laptudirm.com/x/arbiter/pkg/tournament/common"
+	"laptudirm.com/x/arbiter/pkg/tournament/games"
+)
+
 func NewTournament(config Config) (*Tournament, error) {
 	var tour Tournament
-	tour.Engines = make([]*Player, len(config.Engines))
+	tour.Config = config
+	tour.Scores = make([]struct {
+		Wins   int
+		Losses int
+		Draws  int
+	}, len(config.Engines))
 
-	for i, engine := range config.Engines {
-		var err error
-		tour.Engines[i], err = NewEngine(engine)
-
-		if err != nil {
-			return nil, err
-		}
+	switch config.Scheduler {
+	case "round-robin", "":
+		tour.Scheduler = &RoundRobin{}
+	default:
+		return nil, fmt.Errorf("new tour: invalid scheduler %s", config.Scheduler)
 	}
+
+	tour.Scheduler.Initialize(&tour)
 
 	return &tour, nil
 }
 
 type Tournament struct {
-	Engines             []*Player
-	Wins, Draws, Losses int
+	Config Config
+
+	Scheduler Scheduler
+
+	Games  int
+	Scores []struct {
+		Wins, Losses, Draws int
+	}
 }
 
 func (tour *Tournament) Start() error {
+	for game_num := 0; game_num < tour.Scheduler.TotalGames(); game_num++ {
+		p1, p2 := tour.Scheduler.NextPair(game_num)
+		fmt.Printf("Game #%d: %s vs %s\n", game_num+1, tour.Config.Engines[p1].Name, tour.Config.Engines[p2].Name)
+
+		game, err := NewGame(tour.Config.Engines[p1], tour.Config.Engines[p2], "x5o/7/7/7/7/7/o5x x 0 1")
+		if err != nil {
+			return err
+		}
+
+		game.GameEndFn = games.HasAtaxxGameEnded
+
+		score, err := game.Play()
+		if err != nil {
+			return err
+		}
+
+		switch score {
+		case common.WhiteWins:
+			tour.Scores[p1].Wins++
+			tour.Scores[p2].Losses++
+
+		case common.BlackWins:
+			tour.Scores[p2].Wins++
+			tour.Scores[p1].Losses++
+
+		case common.Draw:
+			tour.Scores[p1].Draws++
+			tour.Scores[p2].Draws++
+		}
+
+		fmt.Println("    Name              Ws   Ls   Ds   Total")
+		for i, engine := range tour.Config.Engines {
+			fmt.Printf("%2d. %15s  %4d %4d %4d  %5d\n", i+1, engine.Name, tour.Scores[i].Wins, tour.Scores[i].Losses, tour.Scores[i].Draws, tour.Scores[i].Wins+tour.Scores[i].Losses+tour.Scores[i].Draws)
+		}
+	}
+
 	return nil
 }
 
 type Config struct {
-	Engines []EngineConfig
+	// The engines participating in the tournament.
+	Engines []EngineConfig `yaml:"engines"`
 
-	Concurrency int
-	Draw        struct {
-		MoveNumber int
-		MoveCount  int
-		Score      int
-	}
-	Resign struct {
-		MoveCount int
-		Score     int
-	}
+	// Number of games that will be played concurrently.
+	Concurrency int `yaml:"concurrency"`
 
-	MaxMoves int
+	// Game adjudication stuff.
+	// Draw        struct {
+	// 	MoveNumber int
+	// 	MoveCount  int
+	// 	Score      int
+	// }
+	// Resign struct {
+	// 	MoveCount int
+	// 	Score     int
+	// }
+	// MaxMoves int
 
-	Event string
-	Site  string
+	Event string `yaml:"event"` // Event field of the PGN.
+	Site  string `yaml:"site"`  // Site field of the PGN.
 
-	Games int
+	Scheduler string `yaml:"scheduler"`
 
-	Rounds int
+	// 1 Tournament = {ROUNDS} Rounds
+	// 1 Round      = {SOME_N} Encounters
+	// 1 Encounter  = {GAME_P} Game Pairs
+	// 1 Game Pair  = 2 Games
+	Rounds    int `yaml:"rounds"`     // Number of rounds to run the tournament for.
+	GamePairs int `yaml:"game-pairs"` // Number of games per encounter in every round.
 
 	Sprt struct {
-		Elo0, Elo1  int
-		Alpha, Beta int
+		Elo0, Elo1  int // The null and the alternate elo hypotheses.
+		Alpha, Beta int // Confidence bounds for Error types I and II.
 	}
 
 	Openings struct {
-		File   string
-		Format string
-		Order  string
-		Plies  int
-		Start  int
+		File string
+		// Format string // only EPD opening files supported.
+		Order string
+		Start int
+
+		// When to switch to a new opening in a tournament:
+		// default:
 		Policy string
+
+		// Number of times to play each opening. Only functional if the opening
+		// policy is set to default (or is unset, same difference).
+		Repeat int
 	}
 
-	PGNOut string
-	EPDOut string
+	PGNOut string // File to store the game PGNs at.
+	EPDOut string // File to store the game ends EPD at.
 
+	// Restart a crashed engine instead of stopping the match.
 	Recover bool
 }

@@ -29,6 +29,8 @@ func NewEngine(config EngineConfig) (*Player, error) {
 	engine.protocol = config.Protocol
 	process := exec.Command(config.Cmd, strings.Fields(config.Arg)...)
 
+	engine.config = config
+
 	process.Dir = config.Dir
 
 	stdin, _ := process.StdinPipe()
@@ -38,7 +40,7 @@ func NewEngine(config EngineConfig) (*Player, error) {
 	engine.reader = bufio.NewReader(stdout)
 	engine.lines = make(chan string)
 
-	engine.logger = config.Logger
+	engine.logger = io.Discard
 
 	engine.Cmd = process
 
@@ -74,6 +76,8 @@ func NewEngine(config EngineConfig) (*Player, error) {
 }
 
 type Player struct {
+	config EngineConfig
+
 	*exec.Cmd
 
 	protocol string
@@ -129,24 +133,22 @@ type Player struct {
 // option.OPTION=VALUE	Set custom option OPTION to value VALUE
 
 type EngineConfig struct {
-	Name string `json:"name"`
-	Cmd  string `json:"cmd"`
-	Dir  string `json:"dir"`
-	Arg  string `json:"arg"`
+	Name string `yaml:"name"`
+	Cmd  string `yaml:"cmd"`
+	Dir  string `yaml:"dir"`
+	Arg  string `yaml:"arg"`
 
-	Protocol string `json:"protocol"`
+	Protocol string `yaml:"protocol"`
 
-	Stderr string `json:"stderr"`
+	Stderr string `yaml:"stderr"`
 
-	InitStr string `json:"initString"`
+	InitStr string `yaml:"init-string"`
 
-	Options map[string]string `json:"options"`
+	Options map[string]string `yaml:"options"`
 
-	TimeC string `json:"tc"`
-	Depth int    `json:"depth"`
-	Nodes int    `json:"nodes"`
-
-	Logger io.Writer `json:"-"`
+	TimeC string `yaml:"tc"`
+	Depth int    `yaml:"depth"`
+	Nodes int    `yaml:"nodes"`
 }
 
 // NewGame prepares the engine for a new game of chess.
@@ -217,7 +219,7 @@ func (engine *Player) Await(pattern string, timeout time.Duration) (string, erro
 }
 
 func (engine *Player) Write(format string, a ...any) error {
-	engine.logf("info: (engine)< "+format+"\n", a...)
+	engine.logf("info: ("+engine.config.Name+")< "+format+"\n", a...)
 
 	if _, err := fmt.Fprintf(engine.writer, format+"\n", a...); err != nil {
 		return err

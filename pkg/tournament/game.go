@@ -22,7 +22,7 @@ import (
 	"laptudirm.com/x/arbiter/pkg/tournament/games"
 )
 
-func NewGame(engine1Config, engine2Config EngineConfig, position [6]string) (*Game, error) {
+func NewGame(engine1Config, engine2Config EngineConfig, position string) (*Game, error) {
 	engine1, err := NewEngine(engine1Config)
 	if err != nil {
 		return nil, err
@@ -34,15 +34,14 @@ func NewGame(engine1Config, engine2Config EngineConfig, position [6]string) (*Ga
 	}
 
 	return &Game{
-		StartFEN: position[0] + " " +
-			position[1] + " " +
-			position[2] + " " +
-			position[3] + " " +
-			position[4] + " " +
-			position[5] + " ",
+		StartFEN: position,
 
 		Engines: [2]*Player{
 			engine1, engine2,
+		},
+
+		TotalTime: [2]time.Duration{
+			8 * time.Second, 8 * time.Second,
 		},
 	}, nil
 }
@@ -90,6 +89,9 @@ func (game *Game) Play() (Score, error) {
 		return WhiteWins, err
 	}
 
+	defer game.Engines[0].Kill()
+	defer game.Engines[1].Kill()
+
 	sideToMove := 0
 	for {
 		if game.GameEndFn != nil {
@@ -101,7 +103,7 @@ func (game *Game) Play() (Score, error) {
 
 		engine := game.Engines[sideToMove]
 
-		if err := engine.Write("position fen %s moves %s", game.StartFEN, game.moves); err != nil {
+		if err := engine.Write("position fen %s moves%s", game.StartFEN, game.moves); err != nil {
 			return GameLostBy[sideToMove], err
 		}
 
