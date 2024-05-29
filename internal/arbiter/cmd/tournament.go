@@ -32,9 +32,10 @@ func Tournament() *cobra.Command {
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			engine1, err := tournament.NewEngine(tournament.EngineConfig{
-				Name:   "Mess1",
-				Cmd:    "./engines/mess",
-				Logger: os.Stdout,
+				Name:     "Mess1",
+				Cmd:      "./engines/mexx",
+				Protocol: "uai",
+				Logger:   os.Stdout,
 			})
 
 			if err != nil {
@@ -42,9 +43,10 @@ func Tournament() *cobra.Command {
 			}
 
 			engine2, err := tournament.NewEngine(tournament.EngineConfig{
-				Name:   "Mess2",
-				Cmd:    "./engines/mess",
-				Logger: os.Stdout,
+				Name:     "Mess2",
+				Cmd:      "./engines/mexx",
+				Protocol: "uai",
+				Logger:   os.Stdout,
 			})
 
 			if err != nil {
@@ -52,8 +54,8 @@ func Tournament() *cobra.Command {
 			}
 
 			game := tournament.Game{
-				StartFEN:  "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-				GameEndFn: games.HasChessGameEnded,
+				StartFEN:  "x5o/7/7/7/7/7/o5x x 0 1",
+				GameEndFn: games.HasAtaxxGameEnded,
 
 				Engines: [piece.ColorN]*tournament.Player{
 					engine1, engine2,

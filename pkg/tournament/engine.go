@@ -26,6 +26,7 @@ import (
 
 func NewEngine(config EngineConfig) (*Player, error) {
 	var engine Player
+	engine.protocol = config.Protocol
 	process := exec.Command(config.Cmd, strings.Fields(config.Arg)...)
 
 	process.Dir = config.Dir
@@ -74,6 +75,8 @@ func NewEngine(config EngineConfig) (*Player, error) {
 
 type Player struct {
 	*exec.Cmd
+
+	protocol string
 
 	writer *bufio.Writer
 	reader *bufio.Reader
@@ -131,6 +134,8 @@ type EngineConfig struct {
 	Dir  string `json:"dir"`
 	Arg  string `json:"arg"`
 
+	Protocol string `json:"protocol"`
+
 	Stderr string `json:"stderr"`
 
 	InitStr string `json:"initString"`
@@ -146,7 +151,7 @@ type EngineConfig struct {
 
 // NewGame prepares the engine for a new game of chess.
 func (engine *Player) NewGame() error {
-	if err := engine.Write("ucinewgame"); err != nil {
+	if err := engine.Write(engine.protocol + "newgame"); err != nil {
 		return err
 	}
 
@@ -155,11 +160,11 @@ func (engine *Player) NewGame() error {
 
 // Initialize initializes the engine on startup.
 func (engine *Player) Initialize() error {
-	if err := engine.Write("uci"); err != nil {
+	if err := engine.Write(engine.protocol); err != nil {
 		return err
 	}
 
-	_, err := engine.Await("uciok", 5*time.Second)
+	_, err := engine.Await(engine.protocol+"ok", 5*time.Second)
 	return err
 }
 

@@ -110,9 +110,11 @@ func (game *Game) Play() (Score, error) {
 		}
 
 		if err := engine.Write(
-			"go wtime %d btime %d",
+			"go wtime %d btime %d winc %d binc %d",
 			game.TotalTime[0].Milliseconds(),
 			game.TotalTime[1].Milliseconds(),
+			game.Increment[0].Milliseconds(),
+			game.Increment[1].Milliseconds(),
 		); err != nil {
 			return GameLostBy[sideToMove], err
 		}
@@ -122,21 +124,17 @@ func (game *Game) Play() (Score, error) {
 			"bestmove .*",
 			game.TotalTime[sideToMove],
 		)
+		timeSpent := time.Since(startTime)
 		if err != nil {
 			return GameLostBy[sideToMove], err
 		}
 
-		timeSpent := time.Since(startTime)
-
-		words := strings.Fields(line)
-		if len(words) < 2 || words[0] != "bestmove" {
-			continue
-		}
+		bestmove := strings.Fields(line)[1]
 
 		game.TotalTime[sideToMove] -= timeSpent
 		game.TotalTime[sideToMove] += game.Increment[sideToMove]
 
-		game.moves += " " + words[1]
+		game.moves += " " + bestmove
 
 		sideToMove ^= 1
 	}
