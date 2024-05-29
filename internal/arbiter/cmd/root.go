@@ -49,6 +49,7 @@ func Root() *cobra.Command {
 	root.AddCommand(Install())
 	root.AddCommand(Completion())
 	root.AddCommand(Remove())
+	root.AddCommand(Tournament())
 
 	return root
 }
