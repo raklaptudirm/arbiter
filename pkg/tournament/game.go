@@ -18,8 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"laptudirm.com/x/mess/pkg/board"
-	"laptudirm.com/x/mess/pkg/board/move"
 	"laptudirm.com/x/mess/pkg/board/piece"
 )
 
@@ -35,15 +33,14 @@ func NewGame(engine1Config, engine2Config EngineConfig, position [6]string) (*Ga
 	}
 
 	return &Game{
-		startFEN: position[0] + " " +
+		StartFEN: position[0] + " " +
 			position[1] + " " +
 			position[2] + " " +
 			position[3] + " " +
 			position[4] + " " +
 			position[5] + " ",
-		Board: board.New(board.FEN(position)),
 
-		Engines: [piece.ColorN]*Player{
+		Engines: [2]*Player{
 			engine1, engine2,
 		},
 	}, nil
@@ -69,56 +66,38 @@ func NewGame(engine1Config, engine2Config EngineConfig, position [6]string) (*Ga
 //}
 
 type Game struct {
-	startFEN string
+	StartFEN string
 
-	Board *board.Board
 	moves string
 
-	moveList []move.Move
+	moveList []string
 
-	Engines   [piece.ColorN]*Player
-	TotalTime [piece.ColorN]time.Duration
-	Increment [piece.ColorN]time.Duration
+	Engines   [2]*Player
+	TotalTime [2]time.Duration
+	Increment [2]time.Duration
 }
 
 func (game *Game) Play() (Score, error) {
 	fmt.Println("debug: initializing white")
-	if err := game.Engines[piece.White].NewGame(); err != nil {
+	if err := game.Engines[0].NewGame(); err != nil {
 		return BlackWins, err
 	}
 
 	fmt.Println("debug: initializing black")
-	if err := game.Engines[piece.Black].NewGame(); err != nil {
+	if err := game.Engines[1].NewGame(); err != nil {
 		return WhiteWins, err
 	}
 
-game:
+	sideToMove := 0
 	for {
-		game.moveList = game.Board.GenerateMoves(false)
+		engine := game.Engines[sideToMove]
 
-		switch {
-		case len(game.moveList) == 0:
-			if game.Board.IsInCheck(game.Board.SideToMove) {
-				fmt.Println("info: game over: checkmate")
-				return GameLostBy[game.Board.SideToMove], nil
-			}
-
-			fallthrough
-
-		case game.Board.DrawClock >= 100,
-			game.Board.IsThreefoldRepetition():
-			fmt.Println("info: game over: draw")
-			return Draw, nil
-		}
-
-		engine := game.Engines[game.Board.SideToMove]
-
-		if err := engine.Write("position fen %s moves %s", game.startFEN, game.moves); err != nil {
-			return GameLostBy[game.Board.SideToMove], err
+		if err := engine.Write("position fen %s moves %s", game.StartFEN, game.moves); err != nil {
+			return GameLostBy[sideToMove], err
 		}
 
 		if err := engine.Synchronize(); err != nil {
-			return GameLostBy[game.Board.SideToMove], err
+			return GameLostBy[sideToMove], err
 		}
 
 		if err := engine.Write(
@@ -126,16 +105,16 @@ game:
 			game.TotalTime[piece.White].Milliseconds(),
 			game.TotalTime[piece.Black].Milliseconds(),
 		); err != nil {
-			return GameLostBy[game.Board.SideToMove], err
+			return GameLostBy[sideToMove], err
 		}
 
 		startTime := time.Now()
 		line, err := engine.Await(
 			"bestmove ([a-h][1-8]){2}[nbrq]?( ponder ([a-h][1-8]){2}[nbrq]?)?",
-			game.TotalTime[game.Board.SideToMove],
+			game.TotalTime[sideToMove],
 		)
 		if err != nil {
-			return GameLostBy[game.Board.SideToMove], err
+			return GameLostBy[sideToMove], err
 		}
 
 		timeSpent := time.Since(startTime)
@@ -145,30 +124,13 @@ game:
 			continue
 		}
 
-		move := game.Board.NewMoveFromString(words[1])
-		if !game.isLegal(move) {
-			fmt.Println("info: game over: illegal move")
-			fmt.Printf("info: %v doesn't contain %s\n", game.moveList, move)
-			return GameLostBy[game.Board.SideToMove], nil
-		}
+		game.TotalTime[sideToMove] -= timeSpent
+		game.TotalTime[sideToMove] += game.Increment[sideToMove]
 
-		game.TotalTime[game.Board.SideToMove] -= timeSpent
-		game.TotalTime[game.Board.SideToMove] += game.Increment[game.Board.SideToMove]
+		game.moves += " " + words[1]
 
-		game.Board.MakeMove(move)
-		game.moves += " " + move.String()
-		continue game
+		sideToMove ^= 1
 	}
-}
-
-func (game *Game) isLegal(move move.Move) bool {
-	for _, test := range game.moveList {
-		if move == test {
-			return true
-		}
-	}
-
-	return false
 }
 
 type Result struct {
@@ -191,7 +153,7 @@ const (
 	BlackWins Score = -1
 )
 
-var GameLostBy = [piece.ColorN]Score{
+var GameLostBy = [2]Score{
 	piece.White: BlackWins,
 	piece.Black: WhiteWins,
 }

@@ -20,7 +20,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"laptudirm.com/x/arbiter/pkg/tournament"
-	"laptudirm.com/x/mess/pkg/board"
 	"laptudirm.com/x/mess/pkg/board/piece"
 )
 
@@ -52,7 +51,7 @@ func Tournament() *cobra.Command {
 			}
 
 			game := tournament.Game{
-				Board: board.New(board.FEN(board.StartFEN)),
+				StartFEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
 
 				Engines: [piece.ColorN]*tournament.Player{
 					engine1, engine2,
