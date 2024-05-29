@@ -18,7 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"laptudirm.com/x/mess/pkg/board/piece"
+	. "laptudirm.com/x/arbiter/pkg/tournament/common"
+	"laptudirm.com/x/arbiter/pkg/tournament/games"
 )
 
 func NewGame(engine1Config, engine2Config EngineConfig, position [6]string) (*Game, error) {
@@ -66,7 +67,8 @@ func NewGame(engine1Config, engine2Config EngineConfig, position [6]string) (*Ga
 //}
 
 type Game struct {
-	StartFEN string
+	StartFEN  string
+	GameEndFn games.GameEndedFn
 
 	moves string
 
@@ -90,6 +92,13 @@ func (game *Game) Play() (Score, error) {
 
 	sideToMove := 0
 	for {
+		if game.GameEndFn != nil {
+			ended, result := game.GameEndFn(game.StartFEN, strings.Fields(game.moves))
+			if ended {
+				return result, nil
+			}
+		}
+
 		engine := game.Engines[sideToMove]
 
 		if err := engine.Write("position fen %s moves %s", game.StartFEN, game.moves); err != nil {
@@ -102,15 +111,15 @@ func (game *Game) Play() (Score, error) {
 
 		if err := engine.Write(
 			"go wtime %d btime %d",
-			game.TotalTime[piece.White].Milliseconds(),
-			game.TotalTime[piece.Black].Milliseconds(),
+			game.TotalTime[0].Milliseconds(),
+			game.TotalTime[1].Milliseconds(),
 		); err != nil {
 			return GameLostBy[sideToMove], err
 		}
 
 		startTime := time.Now()
 		line, err := engine.Await(
-			"bestmove ([a-h][1-8]){2}[nbrq]?( ponder ([a-h][1-8]){2}[nbrq]?)?",
+			"bestmove .*",
 			game.TotalTime[sideToMove],
 		)
 		if err != nil {
@@ -144,29 +153,3 @@ const (
 	DrawByInsufficientMaterial = "Draw by insufficient material"
 	DrawByStalemate            = ""
 )
-
-type Score int
-
-const (
-	WhiteWins Score = +1
-	Draw      Score = 0
-	BlackWins Score = -1
-)
-
-var GameLostBy = [2]Score{
-	piece.White: BlackWins,
-	piece.Black: WhiteWins,
-}
-
-func (result Score) String() string {
-	switch result {
-	case WhiteWins:
-		return "1-0"
-	case Draw:
-		return "1/2-1/2"
-	case BlackWins:
-		return "0-1"
-	default:
-		return "?-?"
-	}
-}
