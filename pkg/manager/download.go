@@ -31,8 +31,8 @@ import (
 // Download fetches and builds the given version of the engine, and then moves it
 // to the ARBITER_BINARY_DIR under the binary name <engine-name>-<version-name>.
 func (engine *Engine) Download(version Version) error {
-	binary := VersionBinary(engine, version)    // Name of version's binary file
-	new_version := !Downloaded(engine, version) // Is the version a new download ?
+	binary := VersionBinary(engine, version.Name) // Name of version's binary file
+	new_version := !Downloaded(engine, version)   // Is the version a new download ?
 
 	// Build the given version of the engine and move the file to binary.
 	if err := engine.Build(version, binary); err != nil {

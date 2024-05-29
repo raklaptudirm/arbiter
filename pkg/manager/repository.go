@@ -29,9 +29,7 @@ import (
 // the repository was previously cloned, it tries to get it up to date with the
 // remote repository.
 func FetchRepository(url, path string) (*git.Repository, error) {
-	logrus.Info("Fetching the engine's source repository...")
-	util.StartSpinner()
-	defer util.PauseSpinner()
+	logrus.Debug("Fetching the engine's source repository...")
 
 	// Check if we already have a repository for this engine.
 	logrus.Debug("Trying to open an existing repository...")

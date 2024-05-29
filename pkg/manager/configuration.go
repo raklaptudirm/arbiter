@@ -16,6 +16,7 @@ package manager
 import (
 	"os"
 	"path/filepath"
+	"slices"
 
 	"gopkg.in/yaml.v2"
 
@@ -25,7 +26,7 @@ import (
 // Downloaded checks if the given Version of the given Engine has
 // been downloaded previously by the manager.
 func Downloaded(engine *Engine, version Version) bool {
-	_, err := os.Stat(VersionBinary(engine, version))
+	_, err := os.Stat(VersionBinary(engine, version.Name))
 	return err == nil
 }
 
@@ -36,9 +37,9 @@ func Binary(engine *Engine) string {
 }
 
 // VersionBinary returns the path to the given Version of the given Engine.
-func VersionBinary(engine *Engine, version Version) string {
+func VersionBinary(engine *Engine, version string) string {
 	// ARBITER_BINARY_DIRECTORY/<engine-name>-<version-name>
-	return Binary(engine) + "-" + version.Name
+	return Binary(engine) + "-" + version
 }
 
 // EngineInfoList maps Engine names to its EngineInfo.
@@ -57,11 +58,27 @@ func (list EngineInfoList) TryAddEngine(engine *Engine) {
 	list.Dump()
 }
 
+func (list EngineInfoList) RemoveEngine(engine *Engine) {
+	info := list[engine.Name]
+	info.Current = ""
+	info.Versions = []string{}
+	list[engine.Name] = info
+	list.Dump()
+}
+
 // AddVersion adds the given Version of the given Engine to the EngineInfoList.
 func (list EngineInfoList) AddVersion(engine *Engine, version string) {
 	list.TryAddEngine(engine)
 	info := list[engine.Name]
 	info.Versions = append(info.Versions, version)
+	list[engine.Name] = info
+	list.Dump()
+}
+
+func (list EngineInfoList) RemoveVersion(engine *Engine, version string) {
+	info := list[engine.Name]
+	versionIdx := slices.IndexFunc(info.Versions, func(v string) bool { return v == version })
+	info.Versions = slices.Delete(info.Versions, versionIdx, versionIdx+1)
 	list[engine.Name] = info
 	list.Dump()
 }

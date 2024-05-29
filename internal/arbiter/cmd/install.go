@@ -66,7 +66,7 @@ func Install() *cobra.Command {
 			if !cmd.Flag("no-main").Changed {
 				// Hardlink the engine binary to the latest installation.
 				_ = os.Remove(manager.Binary(engine))
-				_ = os.Link(manager.VersionBinary(engine, version), manager.Binary(engine))
+				_ = os.Link(manager.VersionBinary(engine, version.Name), manager.Binary(engine))
 
 				// Update the main version in the registry.
 				manager.Engines.SetMainVersion(engine.Name, version.Name)

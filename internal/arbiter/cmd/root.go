@@ -48,6 +48,7 @@ func Root() *cobra.Command {
 	root.AddCommand(Engines())
 	root.AddCommand(Install())
 	root.AddCommand(Completion())
+	root.AddCommand(Remove())
 
 	return root
 }
