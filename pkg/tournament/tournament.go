@@ -85,11 +85,11 @@ func (tour *Tournament) Start() error {
 			}
 
 			switch score {
-			case common.WhiteWins:
+			case common.Player1Wins:
 				tour.Scores[p1].Wins++
 				tour.Scores[p2].Losses++
 
-			case common.BlackWins:
+			case common.Player2Wins:
 				tour.Scores[p2].Wins++
 				tour.Scores[p1].Losses++
 

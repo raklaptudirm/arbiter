@@ -26,9 +26,9 @@ func HasAtaxxGameEnded(fen string, moves []string) (bool, common.Score) {
 
 	// No pieces left
 	if pos.pieces[0].Data == 0 {
-		return true, common.BlackWins
+		return true, common.Player2Wins
 	} else if pos.pieces[1].Data == 0 {
-		return true, common.WhiteWins
+		return true, common.Player1Wins
 	}
 
 	// No moves left

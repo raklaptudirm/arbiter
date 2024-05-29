@@ -79,11 +79,11 @@ type Game struct {
 
 func (game *Game) Play() (Score, error) {
 	if err := game.Engines[0].NewGame(); err != nil {
-		return BlackWins, err
+		return Player2Wins, err
 	}
 
 	if err := game.Engines[1].NewGame(); err != nil {
-		return WhiteWins, err
+		return Player1Wins, err
 	}
 
 	defer game.Engines[0].Kill()
