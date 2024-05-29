@@ -1,7 +1,6 @@
 package tournament
 
 import (
-	"fmt"
 	"slices"
 )
 
@@ -41,8 +40,7 @@ func (rr *RoundRobin) Initialize(tour *Tournament) {
 		}
 	}
 
-	fmt.Println(rr.circle_top)
-	fmt.Println(rr.circle_bottom)
+	rr.pair_number = 0
 }
 
 func (rr *RoundRobin) NextPair(game_num int) (int, int) {

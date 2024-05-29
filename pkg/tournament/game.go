@@ -14,7 +14,6 @@
 package tournament
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -79,12 +78,10 @@ type Game struct {
 }
 
 func (game *Game) Play() (Score, error) {
-	fmt.Println("debug: initializing white")
 	if err := game.Engines[0].NewGame(); err != nil {
 		return BlackWins, err
 	}
 
-	fmt.Println("debug: initializing black")
 	if err := game.Engines[1].NewGame(); err != nil {
 		return WhiteWins, err
 	}

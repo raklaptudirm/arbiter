@@ -29,14 +29,18 @@ func NewTournament(config Config) (*Tournament, error) {
 		Draws  int
 	}, len(config.Engines))
 
+	var err error
+	tour.openings, err = NewBook(config.Openings.File, config.Openings.Order)
+	if err != nil {
+		return nil, err
+	}
+
 	switch config.Scheduler {
 	case "round-robin", "":
 		tour.Scheduler = &RoundRobin{}
 	default:
 		return nil, fmt.Errorf("new tour: invalid scheduler %s", config.Scheduler)
 	}
-
-	tour.Scheduler.Initialize(&tour)
 
 	return &tour, nil
 }
@@ -45,6 +49,7 @@ type Tournament struct {
 	Config Config
 
 	Scheduler Scheduler
+	openings  *Book
 
 	Games  int
 	Scores []struct {
@@ -53,39 +58,54 @@ type Tournament struct {
 }
 
 func (tour *Tournament) Start() error {
-	for game_num := 0; game_num < tour.Scheduler.TotalGames(); game_num++ {
-		p1, p2 := tour.Scheduler.NextPair(game_num)
-		fmt.Printf("Game #%d: %s vs %s\n", game_num+1, tour.Config.Engines[p1].Name, tour.Config.Engines[p2].Name)
+	for round := 0; round < tour.Config.Rounds; round++ {
+		tour.Scheduler.Initialize(tour)
 
-		game, err := NewGame(tour.Config.Engines[p1], tour.Config.Engines[p2], "x5o/7/7/7/7/7/o5x x 0 1")
-		if err != nil {
-			return err
-		}
+		for game_num := 0; game_num < tour.Scheduler.TotalGames(); game_num++ {
+			p1, p2 := tour.Scheduler.NextPair(game_num)
+			fmt.Printf(
+				"Round #%d Game #%d: %s vs %s (%s)\n",
+				round+1,
+				game_num+1,
+				tour.Config.Engines[p1].Name,
+				tour.Config.Engines[p2].Name,
+				tour.openings.Current(),
+			)
 
-		game.GameEndFn = games.HasAtaxxGameEnded
+			game, err := NewGame(tour.Config.Engines[p1], tour.Config.Engines[p2], tour.openings.Current())
+			if err != nil {
+				return err
+			}
 
-		score, err := game.Play()
-		if err != nil {
-			return err
-		}
+			game.GameEndFn = games.HasAtaxxGameEnded
 
-		switch score {
-		case common.WhiteWins:
-			tour.Scores[p1].Wins++
-			tour.Scores[p2].Losses++
+			score, err := game.Play()
+			if err != nil {
+				return err
+			}
 
-		case common.BlackWins:
-			tour.Scores[p2].Wins++
-			tour.Scores[p1].Losses++
+			switch score {
+			case common.WhiteWins:
+				tour.Scores[p1].Wins++
+				tour.Scores[p2].Losses++
 
-		case common.Draw:
-			tour.Scores[p1].Draws++
-			tour.Scores[p2].Draws++
-		}
+			case common.BlackWins:
+				tour.Scores[p2].Wins++
+				tour.Scores[p1].Losses++
 
-		fmt.Println("    Name              Ws   Ls   Ds   Total")
-		for i, engine := range tour.Config.Engines {
-			fmt.Printf("%2d. %15s  %4d %4d %4d  %5d\n", i+1, engine.Name, tour.Scores[i].Wins, tour.Scores[i].Losses, tour.Scores[i].Draws, tour.Scores[i].Wins+tour.Scores[i].Losses+tour.Scores[i].Draws)
+			case common.Draw:
+				tour.Scores[p1].Draws++
+				tour.Scores[p2].Draws++
+			}
+
+			fmt.Println("    Name              Ws   Ls   Ds   Total")
+			for i, engine := range tour.Config.Engines {
+				fmt.Printf("%2d. %15s  %4d %4d %4d  %5d\n", i+1, engine.Name, tour.Scores[i].Wins, tour.Scores[i].Losses, tour.Scores[i].Draws, tour.Scores[i].Wins+tour.Scores[i].Losses+tour.Scores[i].Draws)
+			}
+
+			if game_num%2 == 1 {
+				tour.openings.Next()
+			}
 		}
 	}
 
