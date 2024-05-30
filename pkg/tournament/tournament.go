@@ -37,6 +37,13 @@ func NewTournament(config Config) (*Tournament, error) {
 		return nil, err
 	}
 
+	switch config.Game {
+	case "chess":
+		tour.arbiterFn = games.HasChessGameEnded
+	case "ataxx":
+		tour.arbiterFn = games.HasAtaxxGameEnded
+	}
+
 	switch config.Scheduler {
 	case "round-robin", "":
 		tour.Scheduler = &RoundRobin{}
@@ -49,6 +56,8 @@ func NewTournament(config Config) (*Tournament, error) {
 
 type Tournament struct {
 	Config Config
+
+	arbiterFn games.GameEndedFn
 
 	Scheduler Scheduler
 	openings  *Book
@@ -79,7 +88,7 @@ func (tour *Tournament) Start() error {
 				return err
 			}
 
-			game.GameEndFn = games.HasAtaxxGameEnded
+			game.GameEndFn = tour.arbiterFn
 
 			score, err := game.Play()
 			if err != nil {
@@ -124,6 +133,9 @@ func (tour *Tournament) Start() error {
 type Config struct {
 	// The engines participating in the tournament.
 	Engines []EngineConfig `yaml:"engines"`
+
+	// The game that will be played.
+	Game string `yaml:"game"`
 
 	// Number of games that will be played concurrently.
 	Concurrency int `yaml:"concurrency"`

@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -40,7 +41,7 @@ func NewEngine(config EngineConfig) (*Player, error) {
 	engine.reader = bufio.NewReader(stdout)
 	engine.lines = make(chan string)
 
-	engine.logger = io.Discard
+	engine.logger = os.Stderr
 
 	engine.Cmd = process
 
@@ -59,7 +60,7 @@ func NewEngine(config EngineConfig) (*Player, error) {
 
 			line = strings.Trim(line, " \n\t\r")
 
-			engine.logf("info: (engine)> %s\n", line)
+			engine.logf("info: ("+config.Name+")> %s\n", line)
 			engine.lines <- line
 		}
 	}()
