@@ -37,13 +37,6 @@ func NewTournament(config Config) (*Tournament, error) {
 		return nil, err
 	}
 
-	switch config.Game {
-	case "chess":
-		tour.arbiterFn = games.HasChessGameEnded
-	case "ataxx":
-		tour.arbiterFn = games.HasAtaxxGameEnded
-	}
-
 	switch config.Scheduler {
 	case "round-robin", "":
 		tour.Scheduler = &RoundRobin{}
@@ -56,8 +49,6 @@ func NewTournament(config Config) (*Tournament, error) {
 
 type Tournament struct {
 	Config Config
-
-	arbiterFn games.GameEndedFn
 
 	Scheduler Scheduler
 	openings  *Book
@@ -88,7 +79,12 @@ func (tour *Tournament) Start() error {
 				return err
 			}
 
-			game.GameEndFn = tour.arbiterFn
+			switch tour.Config.Game {
+			case "chess":
+				game.Oracle = &games.ChessOracle{}
+			case "ataxx":
+				game.Oracle = &games.ChessOracle{}
+			}
 
 			score, err := game.Play()
 			if err != nil {

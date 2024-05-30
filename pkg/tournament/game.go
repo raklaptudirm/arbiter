@@ -109,8 +109,8 @@ func parseTime(time_str string) (int, time.Duration, time.Duration, error) {
 }
 
 type Game struct {
-	StartFEN  string
-	GameEndFn games.GameEndedFn
+	StartFEN string
+	Oracle   games.Oracle
 
 	moves string
 
@@ -133,20 +133,12 @@ func (game *Game) Play() (Score, error) {
 	defer game.Engines[0].Kill()
 	defer game.Engines[1].Kill()
 
+	if game.Oracle != nil {
+		game.Oracle.Initialize(game.StartFEN)
+	}
+
 	sideToMove := 0
 	for {
-		if game.GameEndFn != nil {
-			result := game.GameEndFn(game.StartFEN, strings.Fields(game.moves))
-			switch result {
-			case games.StmWins:
-				return Player1Wins - Score(2*sideToMove), nil
-			case games.XtmWins:
-				return Player2Wins + Score(2*sideToMove), nil
-			case games.Draw:
-				return Draw, nil
-			}
-		}
-
 		engine := game.Engines[sideToMove]
 
 		if err := engine.Write("position fen %s moves%s", game.StartFEN, game.moves); err != nil {
@@ -178,11 +170,31 @@ func (game *Game) Play() (Score, error) {
 		}
 
 		bestmove := strings.Fields(line)[1]
+		game.moves += " " + bestmove
+
+		if game.Oracle != nil {
+			err := game.Oracle.MakeMove(bestmove)
+			if err != nil {
+				return GameLostBy[sideToMove], err
+			}
+
+			switch game.Oracle.GameResult() {
+			case games.StmWins:
+				return Player1Wins - Score(2*sideToMove), nil
+			case games.XtmWins:
+				return Player2Wins + Score(2*sideToMove), nil
+			case games.Draw:
+				return Draw, nil
+			}
+
+			if game.Oracle.ZeroMoves() {
+				game.StartFEN = game.Oracle.FEN()
+				game.moves = ""
+			}
+		}
 
 		game.TotalTime[sideToMove] -= timeSpent
 		game.TotalTime[sideToMove] += game.Increment[sideToMove]
-
-		game.moves += " " + bestmove
 
 		sideToMove ^= 1
 	}

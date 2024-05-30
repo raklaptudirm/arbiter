@@ -1,28 +1,64 @@
 package games
 
 import (
+	"errors"
+	"strings"
+
 	"laptudirm.com/x/mess/pkg/board"
+	"laptudirm.com/x/mess/pkg/board/move"
 	"laptudirm.com/x/mess/pkg/formats/fen"
 )
 
-func HasChessGameEnded(fenstr string, moves []string) Result {
-	chessboard := board.New(board.FEN(fen.FromString(fenstr)))
-	for _, mov := range moves {
-		chessboard.MakeMove(chessboard.NewMoveFromString(mov))
+type ChessOracle struct {
+	board *board.Board
+	moves []move.Move
+}
+
+func (oracle *ChessOracle) Initialize(fenstr string) {
+	oracle.board = board.New(board.FEN(fen.FromString(fenstr)))
+	oracle.moves = oracle.board.GenerateMoves(false)
+}
+
+func (oracle *ChessOracle) MakeMove(mov_str string) error {
+	found, index := false, 0
+	for i, mov := range oracle.moves {
+		if mov.String() == mov_str {
+			found = true
+			index = i
+			break
+		}
 	}
 
-	movelist := chessboard.GenerateMoves(false)
+	if !found {
+		return errors.New("illegal move")
+	}
 
+	oracle.board.MakeMove(oracle.moves[index])
+	oracle.moves = oracle.board.GenerateMoves(false)
+	return nil
+}
+
+func (oracle *ChessOracle) FEN() string {
+	fen := [6]string(oracle.board.FEN())
+	return strings.Join(fen[:], " ")
+}
+
+func (oracle *ChessOracle) ZeroMoves() bool {
+	return oracle.board.DrawClock == 0
+}
+
+func (oracle *ChessOracle) GameResult() Result {
 	switch {
-	case len(movelist) == 0:
-		if chessboard.IsInCheck(chessboard.SideToMove) {
+	case len(oracle.moves) == 0:
+		if oracle.board.IsInCheck(oracle.board.SideToMove) {
 			return Draw
 		}
 
 		fallthrough
 
-	case chessboard.DrawClock >= 100,
-		chessboard.IsThreefoldRepetition():
+	case oracle.board.DrawClock >= 100,
+		oracle.board.IsThreefoldRepetition(),
+		oracle.board.IsInsufficientMaterial():
 		return Draw
 	}
 
