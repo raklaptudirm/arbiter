@@ -1,4 +1,4 @@
-package tournament
+package match
 
 import (
 	"math/rand"
@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-func NewBook(name string, strategy string) (*Book, error) {
-	var book Book
+func NewBook(name string, strategy string) (*OpeningBook, error) {
+	var book OpeningBook
 	file, err := os.ReadFile(name)
 	if err != nil {
 		return nil, err
@@ -22,13 +22,13 @@ func NewBook(name string, strategy string) (*Book, error) {
 	return &book, nil
 }
 
-type Book struct {
+type OpeningBook struct {
 	entries  []string
 	strategy string
 	current  int
 }
 
-func (book *Book) Next() {
+func (book *OpeningBook) Next() {
 	switch book.strategy {
 	case "random":
 		book.current = rand.Int() % len(book.entries)
@@ -37,6 +37,6 @@ func (book *Book) Next() {
 	}
 }
 
-func (book *Book) Current() string {
+func (book *OpeningBook) Current() string {
 	return book.entries[book.current]
 }

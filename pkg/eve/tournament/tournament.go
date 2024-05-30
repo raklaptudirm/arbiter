@@ -33,7 +33,7 @@ func NewTournament(config Config) (*Tournament, error) {
 	}, len(config.Engines))
 
 	var err error
-	tour.openings, err = NewBook(config.Openings.File, config.Openings.Order)
+	tour.openings, err = match.NewBook(config.Openings.File, config.Openings.Order)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ type Tournament struct {
 	Config Config
 
 	Scheduler schedule.Scheduler
-	openings  *Book
+	openings  *match.OpeningBook
 
 	games    chan *Match
 	results  chan Result
