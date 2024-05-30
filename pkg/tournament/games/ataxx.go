@@ -8,48 +8,70 @@ import (
 	"strings"
 )
 
-func HasAtaxxGameEnded(fen string, moves []string) Result {
-	var pos Position
-	pos.SetFen(fen)
+type AtaxxOracle struct {
+	position Position
+}
 
-	for _, mov := range moves {
-		move, _ := NewMove(mov)
-		pos.MakeMove(*move)
+func (oracle *AtaxxOracle) Initialize(fenstr string) {
+	oracle.position.SetFen(fenstr)
+}
+
+func (oracle *AtaxxOracle) MakeMove(movstr string) error {
+	move, err := NewMove(movstr)
+	if err != nil {
+		return err
 	}
 
-	stm := pos.turn
-	xtm := pos.turn ^ 1
+	oracle.position.MakeMove(*move)
+	return nil
+}
+
+func (oracle *AtaxxOracle) FEN() string {
+	return oracle.position.GetFen()
+}
+
+func (oracle *AtaxxOracle) GameResult() (Result, string) {
+	stm := oracle.position.turn
+	xtm := oracle.position.turn ^ 1
 
 	// Halfmove clock
-	if pos.halfmoves >= 100 {
-		return Draw
+	if oracle.position.halfmoves >= 100 {
+		return Draw, "50-move Rule"
 	}
 
 	// No pieces left
-	if pos.pieces[stm].Data == 0 {
-		return XtmWins
-	} else if pos.pieces[xtm].Data == 0 {
-		return StmWins
+	if oracle.position.pieces[stm].Data == 0 {
+		return XtmWins, "Eradication"
+	} else if oracle.position.pieces[xtm].Data == 0 {
+		return StmWins, "Eradication"
 	}
 
 	// No moves left
-	empty := all ^ pos.pieces[0].Data ^ pos.pieces[1].Data ^ pos.gaps.Data
-	both := Bitboard{pos.pieces[0].Data | pos.pieces[1].Data}
+	empty := all ^ oracle.position.pieces[0].Data ^ oracle.position.pieces[1].Data ^ oracle.position.gaps.Data
+	both := Bitboard{oracle.position.pieces[0].Data | oracle.position.pieces[1].Data}
 	if (both.Singles().Data|both.Doubles().Data)&empty == 0 {
-		stm_n := bits.OnesCount64(pos.pieces[stm].Data)
-		xtm_n := bits.OnesCount64(pos.pieces[xtm].Data)
+		stm_n := bits.OnesCount64(oracle.position.pieces[stm].Data)
+		xtm_n := bits.OnesCount64(oracle.position.pieces[xtm].Data)
 
 		if stm_n > xtm_n {
-			return StmWins
+			return StmWins, "Population Count"
 		} else if xtm_n > stm_n {
-			return XtmWins
+			return XtmWins, "Population Count"
 		} else {
-			return Draw
+			return Draw, "Population Count"
 		}
 	}
 
-	return Ongoing
+	return Ongoing, ""
 }
+
+func (oracle *AtaxxOracle) ZeroMoves() bool {
+	return oracle.position.halfmoves == 0
+}
+
+// Implementation taken from https://github.com/cpirc/gotaxx
+// I wanted to directly use it as a package but this was created
+// before go modules so I can't directly import it :(
 
 const (
 	all uint64 = 0x1FFFFFFFFFFFF
@@ -202,6 +224,7 @@ type Position struct {
 	gaps      Bitboard
 	turn      int
 	halfmoves int
+	fullmoves int
 }
 
 // NewPosition ...
@@ -342,6 +365,10 @@ func (pos *Position) SetFen(fen string) {
 	if len(results) >= 3 {
 		pos.halfmoves, _ = strconv.Atoi(results[2])
 	}
+
+	if len(results) >= 4 {
+		pos.fullmoves, _ = strconv.Atoi(results[3])
+	}
 }
 
 // Move ...
@@ -426,4 +453,64 @@ func (pos *Position) MakeMove(move Move) {
 
 	// Flip turn
 	pos.turn = 1 - pos.turn
+
+	if pos.turn == 0 {
+		pos.fullmoves++
+	}
+}
+
+// GetFen ...
+func (pos *Position) GetFen() string {
+	var fen string = ""
+
+	gaps := 0
+	// Pieces
+	for sq := 42; sq >= 0; sq++ {
+		switch pos.Get(Square{uint8(sq)}) {
+		case 0:
+			if gaps > 0 {
+				fen += strconv.Itoa(gaps)
+				gaps = 0
+			}
+			fen += "x"
+		case 1:
+			if gaps > 0 {
+				fen += strconv.Itoa(gaps)
+				gaps = 0
+			}
+			fen += "o"
+		case 2:
+			if gaps > 0 {
+				fen += strconv.Itoa(gaps)
+				gaps = 0
+			}
+			fen += "-"
+		case 3:
+			gaps++
+		}
+
+		if sq%7 == 6 {
+			sq -= 14
+			if gaps > 0 {
+				fen += strconv.Itoa(gaps)
+				gaps = 0
+			}
+			if sq >= -1 {
+				fen += "/"
+			}
+		}
+	}
+
+	// Turn
+	if pos.turn == 0 {
+		fen += " x"
+	} else {
+		fen += " o"
+	}
+
+	// Halfmoves
+	fen += " " + strconv.Itoa(pos.halfmoves)
+	fen += " " + strconv.Itoa(pos.fullmoves)
+
+	return fen
 }

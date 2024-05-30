@@ -93,7 +93,7 @@ func (tour *Tournament) Start() error {
 			case "chess":
 				game.Oracle = &games.ChessOracle{}
 			case "ataxx":
-				game.Oracle = &games.ChessOracle{}
+				game.Oracle = &games.AtaxxOracle{}
 			}
 
 			tour.games <- game
