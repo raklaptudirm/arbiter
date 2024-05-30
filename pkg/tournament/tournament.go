@@ -43,13 +43,9 @@ func NewTournament(config Config) (*Tournament, error) {
 	tour.results = make(chan Result)
 	tour.complete = make(chan bool)
 
-	switch config.Scheduler {
-	case "round-robin", "":
-		tour.Scheduler = &RoundRobin{}
-	case "gauntlet":
-		tour.Scheduler = &Gauntlet{}
-	default:
-		return nil, fmt.Errorf("new tour: invalid scheduler %s", config.Scheduler)
+	tour.Scheduler, err = GetScheduler(config.Scheduler)
+	if err != nil {
+		return nil, err
 	}
 
 	return &tour, nil
@@ -98,12 +94,7 @@ func (tour *Tournament) Start() error {
 					game.Round, game.Number = round+1, encounter+1
 					game.Player1, game.Player2 = p1, p2
 
-					switch tour.Config.Game {
-					case "chess":
-						game.Oracle = &games.ChessOracle{}
-					case "ataxx":
-						game.Oracle = &games.AtaxxOracle{}
-					}
+					game.Oracle = games.GetOracle(tour.Config.Game)
 
 					tour.games <- game
 					p1, p2 = p2, p1

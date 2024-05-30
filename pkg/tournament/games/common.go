@@ -1,6 +1,15 @@
 package games
 
-type GameEndedFn = func(string, []string) Result
+func GetOracle(name string) Oracle {
+	switch name {
+	case "ataxx":
+		return &AtaxxOracle{}
+	case "chess":
+		return &ChessOracle{}
+	default:
+		return nil
+	}
+}
 
 type Oracle interface {
 	Initialize(fen string)

@@ -1,8 +1,20 @@
 package tournament
 
 import (
+	"fmt"
 	"slices"
 )
+
+func GetScheduler(name string) (Scheduler, error) {
+	switch name {
+	case "round-robin", "":
+		return &RoundRobin{}, nil
+	case "gauntlet":
+		return &Gauntlet{}, nil
+	default:
+		return nil, fmt.Errorf("new tour: invalid scheduler %s", name)
+	}
+}
 
 type Scheduler interface {
 	Initialize(int)
