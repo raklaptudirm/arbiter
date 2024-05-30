@@ -50,6 +50,7 @@ func Root() *cobra.Command {
 	root.AddCommand(Completion())
 	root.AddCommand(Remove())
 	root.AddCommand(Tournament())
+	root.AddCommand(SPRT())
 
 	return root
 }

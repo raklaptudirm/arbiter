@@ -21,10 +21,10 @@ import "math"
 // be correct. It only calculates when at least one of each result is there.
 func SPRT(ws, ds, ls float64, elo0, elo1 float64) (llr float64) {
 	// Implement Dirichlet([0.5, 0.5, 0.5]) prior
-    	ws += 0.5
-    	ds += 0.5
-    	ls += 0.5
-	
+	ws += 0.5
+	ds += 0.5
+	ls += 0.5
+
 	N := ws + ds + ls // total number of games
 	_, dlo := wdlToElo(ws/N, ds/N, ls/N)
 
@@ -60,6 +60,12 @@ func Elo(ws, ds, ls int) (muMin float64, mu float64, muMax float64) {
 	muMin = clampElo(mu + phiInv(0.975)*sigma) // lower bound
 
 	return muMin, clampElo(mu), muMax
+}
+
+func StoppingBounds(alpha, beta float64) (lower float64, upper float64) {
+	lower = math.Log(beta / (1 - alpha))
+	upper = math.Log((1 - beta) / alpha)
+	return
 }
 
 func clampElo(x float64) float64 {
