@@ -46,6 +46,8 @@ func NewTournament(config Config) (*Tournament, error) {
 	switch config.Scheduler {
 	case "round-robin", "":
 		tour.Scheduler = &RoundRobin{}
+	case "gauntlet":
+		tour.Scheduler = &Gauntlet{}
 	default:
 		return nil, fmt.Errorf("new tour: invalid scheduler %s", config.Scheduler)
 	}
