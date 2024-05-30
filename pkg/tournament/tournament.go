@@ -105,14 +105,14 @@ func (tour *Tournament) Start() error {
 				tour.Scores[p2].Draws++
 			}
 
-			fmt.Println("    Name              Elo Err   Wins Loss Draw   Total")
+			fmt.Println("    Name               Elo Err   Wins Loss Draw   Total")
 			for i, engine := range tour.Config.Engines {
 				score := tour.Scores[i]
-				elo, bound, _ := stats.Elo(score.Wins, score.Draws, score.Losses)
+				lower, elo, upper := stats.Elo(score.Wins, score.Draws, score.Losses)
 				fmt.Printf(
-					"%2d. %-15s   %3.0f %3.0f   %4d %4d %4d   %5d\n",
+					"%2d. %-15s   %+4.0f %3.0f   %4d %4d %4d   %5d\n",
 					i+1, engine.Name,
-					elo, math.Abs(bound-elo),
+					elo, math.Max(upper-elo, elo-lower),
 					score.Wins, score.Losses, score.Draws,
 					score.Wins+score.Losses+score.Draws)
 			}
