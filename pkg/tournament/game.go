@@ -109,6 +109,9 @@ func parseTime(time_str string) (int, time.Duration, time.Duration, error) {
 }
 
 type Game struct {
+	Round, Number    int
+	Player1, Player2 int
+
 	StartFEN string
 	Oracle   games.Oracle
 
@@ -122,16 +125,22 @@ type Game struct {
 }
 
 func (game *Game) Play() (Score, error) {
-	if err := game.Engines[0].NewGame(); err != nil {
-		return Player2Wins, err
+	if err := game.Engines[0].Start(); err != nil {
+		return 0, err
 	}
-
-	if err := game.Engines[1].NewGame(); err != nil {
-		return Player1Wins, err
+	if err := game.Engines[1].Start(); err != nil {
+		return 0, err
 	}
 
 	defer game.Engines[0].Kill()
 	defer game.Engines[1].Kill()
+
+	if err := game.Engines[0].NewGame(); err != nil {
+		return Player2Wins, err
+	}
+	if err := game.Engines[1].NewGame(); err != nil {
+		return Player1Wins, err
+	}
 
 	if game.Oracle != nil {
 		game.Oracle.Initialize(game.StartFEN)

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/sirupsen/logrus"
 	"laptudirm.com/x/arbiter/pkg/stats"
 	"laptudirm.com/x/arbiter/pkg/tournament/common"
 	"laptudirm.com/x/arbiter/pkg/tournament/games"
@@ -37,6 +38,8 @@ func NewTournament(config Config) (*Tournament, error) {
 		return nil, err
 	}
 
+	tour.games = make(chan *Game)
+
 	switch config.Scheduler {
 	case "round-robin", "":
 		tour.Scheduler = &RoundRobin{}
@@ -53,6 +56,8 @@ type Tournament struct {
 	Scheduler Scheduler
 	openings  *Book
 
+	games chan *Game
+
 	Games  int
 	Scores []struct {
 		Wins, Losses, Draws int
@@ -60,24 +65,23 @@ type Tournament struct {
 }
 
 func (tour *Tournament) Start() error {
+	for i := 0; i < tour.Config.Concurrency; i++ {
+		go tour.Thread()
+	}
+
 	for round := 0; round < tour.Config.Rounds; round++ {
 		tour.Scheduler.Initialize(tour)
 
 		for game_num := 0; game_num < tour.Scheduler.TotalGames(); game_num++ {
 			p1, p2 := tour.Scheduler.NextPair(game_num)
-			fmt.Printf(
-				"Round #%d Game #%d: %s vs %s (%s)\n",
-				round+1,
-				game_num+1,
-				tour.Config.Engines[p1].Name,
-				tour.Config.Engines[p2].Name,
-				tour.openings.Current(),
-			)
 
 			game, err := NewGame(tour.Config.Engines[p1], tour.Config.Engines[p2], tour.openings.Current())
 			if err != nil {
 				return err
 			}
+
+			game.Round, game.Number = round+1, game_num+1
+			game.Player1, game.Player2 = p1, p2
 
 			switch tour.Config.Game {
 			case "chess":
@@ -86,36 +90,7 @@ func (tour *Tournament) Start() error {
 				game.Oracle = &games.ChessOracle{}
 			}
 
-			score, err := game.Play()
-			if err != nil {
-				return err
-			}
-
-			switch score {
-			case common.Player1Wins:
-				tour.Scores[p1].Wins++
-				tour.Scores[p2].Losses++
-
-			case common.Player2Wins:
-				tour.Scores[p2].Wins++
-				tour.Scores[p1].Losses++
-
-			case common.Draw:
-				tour.Scores[p1].Draws++
-				tour.Scores[p2].Draws++
-			}
-
-			fmt.Println("    Name               Elo Err   Wins Loss Draw   Total")
-			for i, engine := range tour.Config.Engines {
-				score := tour.Scores[i]
-				lower, elo, upper := stats.Elo(score.Wins, score.Draws, score.Losses)
-				fmt.Printf(
-					"%2d. %-15s   %+4.0f %3.0f   %4d %4d %4d   %5d\n",
-					i+1, engine.Name,
-					elo, math.Max(upper-elo, elo-lower),
-					score.Wins, score.Losses, score.Draws,
-					score.Wins+score.Losses+score.Draws)
-			}
+			tour.games <- game
 
 			if game_num%2 == 1 {
 				tour.openings.Next()
@@ -123,6 +98,59 @@ func (tour *Tournament) Start() error {
 		}
 	}
 
+	close(tour.games)
+
+	return nil
+}
+
+func (tour *Tournament) Thread() {
+	for game := range tour.games {
+		if err := tour.RunGame(game); err != nil {
+			logrus.Error(err)
+		}
+	}
+}
+
+func (tour *Tournament) RunGame(game *Game) error {
+	fmt.Printf(
+		"Round #%d Game #%d: %s vs %s (%s)\n",
+		game.Round,
+		game.Number,
+		game.Engines[0].config.Name,
+		game.Engines[1].config.Name,
+		tour.openings.Current(),
+	)
+
+	score, err := game.Play()
+	if err != nil {
+		return err
+	}
+
+	switch score {
+	case common.Player1Wins:
+		tour.Scores[game.Player1].Wins++
+		tour.Scores[game.Player2].Losses++
+
+	case common.Player2Wins:
+		tour.Scores[game.Player2].Wins++
+		tour.Scores[game.Player1].Losses++
+
+	case common.Draw:
+		tour.Scores[game.Player1].Draws++
+		tour.Scores[game.Player2].Draws++
+	}
+
+	fmt.Println("    Name               Elo Err   Wins Loss Draw   Total")
+	for i, engine := range tour.Config.Engines {
+		score := tour.Scores[i]
+		lower, elo, upper := stats.Elo(score.Wins, score.Draws, score.Losses)
+		fmt.Printf(
+			"%2d. %-15s   %+4.0f %3.0f   %4d %4d %4d   %5d\n",
+			i+1, engine.Name,
+			elo, math.Max(upper-elo, elo-lower),
+			score.Wins, score.Losses, score.Draws,
+			score.Wins+score.Losses+score.Draws)
+	}
 	return nil
 }
 

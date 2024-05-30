@@ -45,34 +45,6 @@ func NewEngine(config EngineConfig) (*Player, error) {
 
 	engine.Cmd = process
 
-	if err := process.Start(); err != nil {
-		return nil, err
-	}
-
-	go func() {
-		for {
-			line, err := engine.reader.ReadString('\n')
-			if err != nil {
-				engine.err = err
-				close(engine.lines)
-				return
-			}
-
-			line = strings.Trim(line, " \n\t\r")
-
-			engine.logf("info: ("+config.Name+")> %s\n", line)
-			engine.lines <- line
-		}
-	}()
-
-	if config.InitStr != "" {
-		if err := engine.Write(config.InitStr); err != nil {
-			return nil, err
-		}
-	}
-
-	engine.Initialize()
-
 	return &engine, nil
 }
 
@@ -92,6 +64,37 @@ type Player struct {
 	err    error
 }
 
+func (engine *Player) Start() error {
+	if err := engine.Cmd.Start(); err != nil {
+		return err
+	}
+
+	go func() {
+		for {
+			line, err := engine.reader.ReadString('\n')
+			if err != nil {
+				engine.err = err
+				close(engine.lines)
+				return
+			}
+
+			line = strings.Trim(line, " \n\t\r")
+
+			engine.logf("info: ("+engine.config.Name+")> %s\n", line)
+			engine.lines <- line
+		}
+	}()
+
+	if engine.config.InitStr != "" {
+		if err := engine.Write(engine.config.InitStr); err != nil {
+			return nil
+		}
+	}
+
+	engine.Initialize()
+	return nil
+}
+
 // conf=NAME		Use an engine with the name NAME from Cute Chess'
 // 		engines.json configuration file.
 // name=NAME		Set the name to NAME
@@ -99,7 +102,7 @@ type Player struct {
 // dir=DIR		Set the working directory to DIR
 // arg=ARG		Pass ARG to the engine as a command line argument
 // initstr=TEXT		Send TEXT to the engine's standard input at startup.
-// 		TEXT may contain multiple lines seprated by '\n'.
+// 		TEXT may contain multiple lines separated by '\n'.
 // stderr=FILE		Redirect standard error output to FILE
 // restart=MODE		Set the restart mode to MODE which can be:
 // 		'auto': the engine decides whether to restart (default)
@@ -110,9 +113,6 @@ type Player struct {
 // 		than two engines.
 // trust			Trust result claims from the engine without validation.
 // 		By default all claims are validated.
-// proto=PROTOCOL	Set the chess protocol to PROTOCOL, which can be one of:
-// 		'xboard': The Xboard/Winboard/CECP protocol
-// 		'uci': The Universal Chess Interface
 // tc=TIMECONTROL	Set the time control to TIMECONTROL. The format is
 // 		moves/time+increment, where 'moves' is the number of
 // 		moves per tc, 'time' is time per tc (either seconds or
