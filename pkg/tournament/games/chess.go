@@ -22,7 +22,7 @@ func (oracle *ChessOracle) Initialize(fenstr string) {
 func (oracle *ChessOracle) MakeMove(mov_str string) error {
 	found, index := false, 0
 	for i, mov := range oracle.moves {
-		if mov.String() == mov_str {
+		if strings.EqualFold(mov.String(), mov_str) {
 			found = true
 			index = i
 			break
