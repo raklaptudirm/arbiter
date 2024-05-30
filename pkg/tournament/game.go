@@ -165,12 +165,17 @@ func (game *Game) Play() (Score, error) {
 			game.TotalTime[sideToMove],
 		)
 		timeSpent := time.Since(startTime)
+		game.TotalTime[sideToMove] -= timeSpent
+		game.TotalTime[sideToMove] += game.Increment[sideToMove]
+
 		if err != nil {
 			return GameLostBy[sideToMove], err
 		}
 
 		bestmove := strings.Fields(line)[1]
 		game.moves += " " + bestmove
+
+		sideToMove ^= 1
 
 		if game.Oracle != nil {
 			err := game.Oracle.MakeMove(bestmove)
@@ -192,11 +197,6 @@ func (game *Game) Play() (Score, error) {
 				game.moves = ""
 			}
 		}
-
-		game.TotalTime[sideToMove] -= timeSpent
-		game.TotalTime[sideToMove] += game.Increment[sideToMove]
-
-		sideToMove ^= 1
 	}
 }
 
