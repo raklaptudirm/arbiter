@@ -92,9 +92,14 @@ func (game *Game) Play() (Score, error) {
 	sideToMove := 0
 	for {
 		if game.GameEndFn != nil {
-			ended, result := game.GameEndFn(game.StartFEN, strings.Fields(game.moves))
-			if ended {
-				return result, nil
+			result := game.GameEndFn(game.StartFEN, strings.Fields(game.moves))
+			switch result {
+			case games.StmWins:
+				return Player1Wins - Score(2*sideToMove), nil
+			case games.XtmWins:
+				return Player2Wins + Score(2*sideToMove), nil
+			case games.Draw:
+				return Draw, nil
 			}
 		}
 

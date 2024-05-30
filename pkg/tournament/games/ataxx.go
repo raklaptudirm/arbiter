@@ -6,11 +6,9 @@ import (
 	"math/bits"
 	"strconv"
 	"strings"
-
-	"laptudirm.com/x/arbiter/pkg/tournament/common"
 )
 
-func HasAtaxxGameEnded(fen string, moves []string) (bool, common.Score) {
+func HasAtaxxGameEnded(fen string, moves []string) Result {
 	var pos Position
 	pos.SetFen(fen)
 
@@ -19,32 +17,38 @@ func HasAtaxxGameEnded(fen string, moves []string) (bool, common.Score) {
 		pos.MakeMove(*move)
 	}
 
+	stm := pos.turn
+	xtm := pos.turn ^ 1
+
 	// Halfmove clock
 	if pos.halfmoves >= 100 {
-		return true, common.Draw
+		return Draw
 	}
 
 	// No pieces left
-	if pos.pieces[0].Data == 0 {
-		return true, common.Player2Wins
-	} else if pos.pieces[1].Data == 0 {
-		return true, common.Player1Wins
+	if pos.pieces[stm].Data == 0 {
+		return XtmWins
+	} else if pos.pieces[xtm].Data == 0 {
+		return StmWins
 	}
 
 	// No moves left
 	empty := all ^ pos.pieces[0].Data ^ pos.pieces[1].Data ^ pos.gaps.Data
 	both := Bitboard{pos.pieces[0].Data | pos.pieces[1].Data}
 	if (both.Singles().Data|both.Doubles().Data)&empty == 0 {
-		// if pos.pieces[0] > pos.pieces[1] {
-		// 	return true, common.WhiteWins
-		// } else if pos.pieces[1] > pos.pieces[0] {
-		// 	return true, common.BlackWins
-		// } else {
-		return true, common.Draw
-		//}
+		stm_n := bits.OnesCount64(pos.pieces[stm].Data)
+		xtm_n := bits.OnesCount64(pos.pieces[xtm].Data)
+
+		if stm_n > xtm_n {
+			return StmWins
+		} else if xtm_n > stm_n {
+			return XtmWins
+		} else {
+			return Draw
+		}
 	}
 
-	return false, 0
+	return Ongoing
 }
 
 const (
