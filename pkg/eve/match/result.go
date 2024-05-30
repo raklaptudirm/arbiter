@@ -1,19 +1,19 @@
-package common
+package match
 
-type Score int
+type Result int
 
 const (
-	Player1Wins Score = +1
-	Draw        Score = 0
-	Player2Wins Score = -1
+	Player1Wins Result = +1
+	Draw        Result = 0
+	Player2Wins Result = -1
 )
 
-var GameLostBy = [2]Score{
+var GameLostBy = [2]Result{
 	0: Player2Wins,
 	1: Player1Wins,
 }
 
-func (result Score) String() string {
+func (result Result) String() string {
 	switch result {
 	case Player1Wins:
 		return "1-0"

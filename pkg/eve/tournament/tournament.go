@@ -18,9 +18,9 @@ import (
 	"math"
 
 	"github.com/sirupsen/logrus"
-	"laptudirm.com/x/arbiter/pkg/stats"
-	"laptudirm.com/x/arbiter/pkg/tournament/common"
-	"laptudirm.com/x/arbiter/pkg/tournament/games"
+	"laptudirm.com/x/arbiter/pkg/eve/match"
+	"laptudirm.com/x/arbiter/pkg/eve/stats"
+	"laptudirm.com/x/arbiter/pkg/eve/tournament/schedule"
 )
 
 func NewTournament(config Config) (*Tournament, error) {
@@ -38,11 +38,11 @@ func NewTournament(config Config) (*Tournament, error) {
 		return nil, err
 	}
 
-	tour.games = make(chan *Game)
+	tour.games = make(chan *Match)
 	tour.results = make(chan Result)
 	tour.complete = make(chan bool)
 
-	tour.Scheduler, err = GetScheduler(config.Scheduler)
+	tour.Scheduler, err = schedule.New(config.Scheduler)
 	if err != nil {
 		return nil, err
 	}
@@ -53,10 +53,10 @@ func NewTournament(config Config) (*Tournament, error) {
 type Tournament struct {
 	Config Config
 
-	Scheduler Scheduler
+	Scheduler schedule.Scheduler
 	openings  *Book
 
-	games    chan *Game
+	games    chan *Match
 	results  chan Result
 	complete chan bool
 
@@ -85,17 +85,24 @@ func (tour *Tournament) Start() error {
 
 			for pair := 0; pair < tour.Config.GamePairs; pair++ {
 				for game := 0; game < 2; game++ {
-					game, err := NewGame(tour.Config.Engines[p1], tour.Config.Engines[p2], tour.openings.Current())
-					if err != nil {
-						return err
+					tour.games <- &Match{
+						Config: match.Config{
+							Game:        tour.Config.Game,
+							PositionFEN: tour.openings.Current(),
+							Engines: [2]match.EngineConfig{
+								tour.Config.Engines[p1],
+								tour.Config.Engines[p2],
+							},
+						},
+
+						Round:  round + 1,
+						Number: encounter*tour.Scheduler.TotalEncounters() + pair*2 + game + 1,
+
+						Player1: p1,
+						Player2: p2,
 					}
 
-					game.Round, game.Number = round+1, encounter+1
-					game.Player1, game.Player2 = p1, p2
-
-					game.Oracle = games.GetOracle(tour.Config.Game)
-
-					tour.games <- game
+					// Switch turn.
 					p1, p2 = p2, p1
 				}
 
@@ -120,24 +127,27 @@ func (tour *Tournament) Thread() {
 	}
 }
 
-func (tour *Tournament) RunGame(game *Game) error {
+type Match struct {
+	match.Config
+
+	Round, Number    int
+	Player1, Player2 int
+}
+
+func (tour *Tournament) RunGame(game *Match) error {
 	logrus.Infof(
 		"\x1b[33mStarting\x1b[0m Round #%d Game #%d: %s vs %s (\x1b[33m%s\x1b[0m)\n",
 		game.Round,
 		game.Number,
-		game.Engines[0].config.Name,
-		game.Engines[1].config.Name,
+		game.Engines[0].Name,
+		game.Engines[1].Name,
 		tour.openings.Current(),
 	)
 
-	score, reason := game.Play()
+	score, reason := match.Run(&game.Config)
 
 	tour.results <- Result{
-		Game: game,
-
-		Player1: game.Player1,
-		Player2: game.Player2,
-
+		Match:  game,
 		Result: score,
 		Reason: reason,
 	}
@@ -152,25 +162,25 @@ func (tour *Tournament) ResultHandler() {
 		result_count++
 
 		switch result.Result {
-		case common.Player1Wins:
-			tour.Scores[result.Player1].Wins++
-			tour.Scores[result.Player2].Losses++
+		case match.Player1Wins:
+			tour.Scores[result.Match.Player1].Wins++
+			tour.Scores[result.Match.Player2].Losses++
 
-		case common.Player2Wins:
-			tour.Scores[result.Player2].Wins++
-			tour.Scores[result.Player1].Losses++
+		case match.Player2Wins:
+			tour.Scores[result.Match.Player2].Wins++
+			tour.Scores[result.Match.Player1].Losses++
 
-		case common.Draw:
-			tour.Scores[result.Player1].Draws++
-			tour.Scores[result.Player2].Draws++
+		case match.Draw:
+			tour.Scores[result.Match.Player1].Draws++
+			tour.Scores[result.Match.Player2].Draws++
 		}
 
 		logrus.Infof(
 			"\x1b[32mFinished\x1b[0m Round #%d Game #%d: %s vs %s: %s\n",
-			result.Game.Round,
-			result.Game.Number,
-			result.Game.Engines[0].config.Name,
-			result.Game.Engines[1].config.Name,
+			result.Match.Round,
+			result.Match.Number,
+			result.Match.Engines[0].Name,
+			result.Match.Engines[1].Name,
 			result,
 		)
 
@@ -215,21 +225,19 @@ func (tour *Tournament) Report() {
 }
 
 type Result struct {
-	Game *Game
+	Match *Match
 
-	Player1, Player2 int
-
-	Result common.Score
+	Result match.Result
 	Reason string
 }
 
 func (result Result) String() string {
 	switch result.Result {
-	case common.Player1Wins:
-		return fmt.Sprintf("%s wins by %s", result.Game.Engines[0].config.Name, result.Reason)
-	case common.Player2Wins:
-		return fmt.Sprintf("%s wins by %s", result.Game.Engines[1].config.Name, result.Reason)
-	case common.Draw:
+	case match.Player1Wins:
+		return fmt.Sprintf("%s wins by %s", result.Match.Engines[0].Name, result.Reason)
+	case match.Player2Wins:
+		return fmt.Sprintf("%s wins by %s", result.Match.Engines[1].Name, result.Reason)
+	case match.Draw:
 		return fmt.Sprintf("Draw by %s", result.Reason)
 	}
 
@@ -238,7 +246,7 @@ func (result Result) String() string {
 
 type Config struct {
 	// The engines participating in the tournament.
-	Engines []EngineConfig `yaml:"engines"`
+	Engines []match.EngineConfig `yaml:"engines"`
 
 	// The game that will be played.
 	Game string `yaml:"game"`

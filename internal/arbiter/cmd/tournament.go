@@ -18,7 +18,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
-	"laptudirm.com/x/arbiter/pkg/tournament"
+	"laptudirm.com/x/arbiter/pkg/eve/tournament"
 )
 
 func Tournament() *cobra.Command {
