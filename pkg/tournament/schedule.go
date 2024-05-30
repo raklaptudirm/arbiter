@@ -5,29 +5,23 @@ import (
 )
 
 type Scheduler interface {
-	Initialize(*Tournament)
-	NextPair(game_number int) (int, int)
-	TotalGames() int
+	Initialize(int)
+	NextEncounter() (int, int)
+	TotalEncounters() int
 }
 
 type RoundRobin struct {
-	tournament *Tournament
-
 	player_count int
 
-	pair_number         int
-	games_per_encounter int
+	pair_number int
 
 	player1, player2          int
 	circle_top, circle_bottom []int
 }
 
-func (rr *RoundRobin) Initialize(tour *Tournament) {
-	rr.tournament = tour
-	rr.player_count = len(tour.Config.Engines)
+func (rr *RoundRobin) Initialize(n int) {
+	rr.player_count = n
 	rounded_total := rr.player_count + rr.player_count%2
-
-	rr.games_per_encounter = 2 * tour.Config.GamePairs
 
 	rr.circle_top = make([]int, rounded_total/2)
 	rr.circle_bottom = make([]int, rounded_total/2)
@@ -43,12 +37,7 @@ func (rr *RoundRobin) Initialize(tour *Tournament) {
 	rr.pair_number = 0
 }
 
-func (rr *RoundRobin) NextPair(game_num int) (int, int) {
-	if game_num%rr.games_per_encounter != 0 {
-		rr.player1, rr.player2 = rr.player2, rr.player1
-		return rr.player1, rr.player2
-	}
-
+func (rr *RoundRobin) NextEncounter() (int, int) {
 	if rr.pair_number >= len(rr.circle_top) {
 		rr.pair_number = 0
 
@@ -68,9 +57,9 @@ func (rr *RoundRobin) NextPair(game_num int) (int, int) {
 		return rr.player1, rr.player2
 	}
 
-	return rr.NextPair(game_num)
+	return rr.NextEncounter()
 }
 
-func (rr *RoundRobin) TotalGames() int {
-	return (rr.player_count * (rr.player_count - 1) / 2) * rr.games_per_encounter
+func (rr *RoundRobin) TotalEncounters() int {
+	return rr.player_count * (rr.player_count - 1) / 2
 }

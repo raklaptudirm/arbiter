@@ -70,36 +70,46 @@ type Tournament struct {
 }
 
 func (tour *Tournament) Start() error {
+	// 1 Tournament = {ROUNDS} Rounds
+	// 1 Round      = {SOME_N} Encounters
+	// 1 Encounter  = {GAME_P} Game Pairs
+	// 1 Game Pair  = 2 Games
+
 	go tour.ResultHandler()
 	for i := 0; i < tour.Config.Concurrency; i++ {
 		go tour.Thread()
 	}
 
 	for round := 0; round < tour.Config.Rounds; round++ {
-		tour.Scheduler.Initialize(tour)
+		tour.Scheduler.Initialize(len(tour.Config.Engines))
 
-		for game_num := 0; game_num < tour.Scheduler.TotalGames(); game_num++ {
-			p1, p2 := tour.Scheduler.NextPair(game_num)
+		for encounter := 0; encounter < tour.Scheduler.TotalEncounters(); encounter++ {
+			p1, p2 := tour.Scheduler.NextEncounter()
 
-			game, err := NewGame(tour.Config.Engines[p1], tour.Config.Engines[p2], tour.openings.Current())
-			if err != nil {
-				return err
-			}
+			for pair := 0; pair < tour.Config.GamePairs; pair++ {
+				for game := 0; game < 2; game++ {
+					game, err := NewGame(tour.Config.Engines[p1], tour.Config.Engines[p2], tour.openings.Current())
+					if err != nil {
+						return err
+					}
 
-			game.Round, game.Number = round+1, game_num+1
-			game.Player1, game.Player2 = p1, p2
+					game.Round, game.Number = round+1, encounter+1
+					game.Player1, game.Player2 = p1, p2
 
-			switch tour.Config.Game {
-			case "chess":
-				game.Oracle = &games.ChessOracle{}
-			case "ataxx":
-				game.Oracle = &games.AtaxxOracle{}
-			}
+					switch tour.Config.Game {
+					case "chess":
+						game.Oracle = &games.ChessOracle{}
+					case "ataxx":
+						game.Oracle = &games.AtaxxOracle{}
+					}
 
-			tour.games <- game
+					tour.games <- game
+					p1, p2 = p2, p1
+				}
 
-			if game_num%2 == 1 {
-				tour.openings.Next()
+				if encounter%2 == 1 {
+					tour.openings.Next()
+				}
 			}
 		}
 	}
@@ -145,6 +155,7 @@ func (tour *Tournament) RunGame(game *Game) error {
 
 func (tour *Tournament) ResultHandler() {
 	result_count := 0
+	result_target := tour.Config.Rounds * tour.Scheduler.TotalEncounters() * tour.Config.GamePairs * 2
 	for result := range tour.results {
 		result_count++
 
@@ -188,7 +199,7 @@ func (tour *Tournament) ResultHandler() {
 			fmt.Println("╚══════════════════════════════════════════════════════════╝")
 		}
 
-		if result_count == tour.Scheduler.TotalGames()*tour.Config.Rounds {
+		if result_count == result_target {
 			close(tour.results)
 			tour.complete <- true
 			return
