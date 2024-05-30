@@ -51,7 +51,7 @@ func (oracle *ChessOracle) GameResult() Result {
 	switch {
 	case len(oracle.moves) == 0:
 		if oracle.board.IsInCheck(oracle.board.SideToMove) {
-			return Draw
+			return XtmWins
 		}
 
 		fallthrough
