@@ -14,6 +14,8 @@
 package tournament
 
 import (
+	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +34,15 @@ func NewGame(engine1Config, engine2Config EngineConfig, position string) (*Game,
 		return nil, err
 	}
 
+	_, time_1, inc_1, err := parseTime(engine1Config.TimeC)
+	if err != nil {
+		return nil, err
+	}
+	_, time_2, inc_2, err := parseTime(engine1Config.TimeC)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Game{
 		StartFEN: position,
 
@@ -40,29 +51,62 @@ func NewGame(engine1Config, engine2Config EngineConfig, position string) (*Game,
 		},
 
 		TotalTime: [2]time.Duration{
-			8 * time.Second, 8 * time.Second,
+			time_1, time_2,
+		},
+
+		Increment: [2]time.Duration{
+			inc_1, inc_2,
 		},
 	}, nil
 }
 
-//func parseTime(time string) (int, time.Duration, time.Duration, error) {
-//	movesStr, time, found := strings.Cut(time, "/")
-//	var moveN int
-//	var err error
-//	if found {
-//		moveN, err = strconv.Atoi(movesStr)
-//		if err != nil {
-//			return 0, 0, 0, err
-//		}
-//	}
-//
-//	perMove, increment, found := strings.Cut(time, "+")
-//	if !found {
-//		return 0, 0, 0, errors.New("parse tc: increment not found")
-//	}
-//
-//	increment, err := strconv.Atoi(increment)
-//}
+// movestogo/time+increment, where time seconds or minutes:seconds
+func parseTime(time_str string) (int, time.Duration, time.Duration, error) {
+	moves_str, time_str, found := strings.Cut(time_str, "/")
+	movestogo := -1
+	var err error
+	if found {
+		movestogo, err = strconv.Atoi(moves_str)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+	} else {
+		time_str = moves_str
+	}
+
+	time_str, inc_str, found := strings.Cut(time_str, "+")
+	if !found {
+		return 0, 0, 0, errors.New("parse tc: increment not found")
+	}
+
+	incs, err := strconv.ParseFloat(inc_str, 32)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	increment := time.Millisecond * time.Duration(incs*1000)
+
+	movetime := time.Duration(0)
+	min_str, sec_str, found := strings.Cut(time_str, ":")
+	if found {
+		mins, err := strconv.ParseFloat(min_str, 32)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+
+		movetime += time.Minute * time.Duration(mins)
+	} else {
+		sec_str = min_str
+	}
+
+	secs, err := strconv.ParseFloat(sec_str, 32)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	movetime += time.Millisecond * time.Duration(secs*1000)
+	return movestogo, movetime, increment, nil
+}
 
 type Game struct {
 	StartFEN  string
