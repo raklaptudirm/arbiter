@@ -16,7 +16,6 @@ package tournament
 import (
 	"fmt"
 	"math"
-	"os"
 
 	"github.com/sirupsen/logrus"
 	"laptudirm.com/x/arbiter/pkg/stats"
@@ -122,8 +121,8 @@ func (tour *Tournament) Thread() {
 }
 
 func (tour *Tournament) RunGame(game *Game) error {
-	fmt.Printf(
-		"Round #%d Game #%d: %s vs %s (%s)\n",
+	logrus.Infof(
+		"\x1b[33mStarting\x1b[0m Round #%d Game #%d: %s vs %s (\x1b[33m%s\x1b[0m)\n",
 		game.Round,
 		game.Number,
 		game.Engines[0].config.Name,
@@ -166,8 +165,8 @@ func (tour *Tournament) ResultHandler() {
 			tour.Scores[result.Player2].Draws++
 		}
 
-		fmt.Fprintf(os.Stderr,
-			"Round #%d Game #%d: %s vs %s: %s\n",
+		logrus.Infof(
+			"\x1b[32mFinished\x1b[0m Round #%d Game #%d: %s vs %s: %s\n",
 			result.Game.Round,
 			result.Game.Number,
 			result.Game.Engines[0].config.Name,
@@ -176,20 +175,7 @@ func (tour *Tournament) ResultHandler() {
 		)
 
 		if result_count%5 == 0 {
-			fmt.Println("╔══════════════════════════════════════════════════════════╗")
-			fmt.Println("║    Name               Elo Error   Wins Loss Draw   Total ║")
-			fmt.Println("╠══════════════════════════════════════════════════════════╣")
-			for i, engine := range tour.Config.Engines {
-				score := tour.Scores[i]
-				lower, elo, upper := stats.Elo(score.Wins, score.Draws, score.Losses)
-				fmt.Printf(
-					"║ %2d. %-15s   %+4.0f %4.0f   %4d %4d %4d   %5d ║\n",
-					i+1, engine.Name,
-					elo, math.Abs(math.Max(upper-elo, elo-lower)),
-					score.Wins, score.Losses, score.Draws,
-					score.Wins+score.Losses+score.Draws)
-			}
-			fmt.Println("╚══════════════════════════════════════════════════════════╝")
+			tour.Report()
 		}
 
 		if result_count == result_target {
@@ -199,6 +185,33 @@ func (tour *Tournament) ResultHandler() {
 		}
 	}
 
+}
+
+func (tour *Tournament) Report() {
+	fmt.Println("╔══════════════════════════════════════════════════════════╗")
+	fmt.Println("║    Name               Elo Error   Wins Loss Draw   Total ║")
+	fmt.Println("╠══════════════════════════════════════════════════════════╣")
+	for i, engine := range tour.Config.Engines {
+		score := tour.Scores[i]
+		lower, elo, upper := stats.Elo(score.Wins, score.Draws, score.Losses)
+
+		format := "║ %2d. %-15s   %+4.0f %4.0f   %4d %4d %4d   %5d ║\n"
+		if tour.Config.Scheduler == "gauntlet" && i == 0 {
+			if elo >= 0 {
+				format = "║ \x1b[32m%2d. %-15s   %+4.0f %4.0f   %4d %4d %4d   %5d\x1b[0m ║\n"
+			} else {
+				format = "║ \x1b[31m%2d. %-15s   %+4.0f %4.0f   %4d %4d %4d   %5d\x1b[0m ║\n"
+			}
+		}
+
+		fmt.Printf(
+			format,
+			i+1, engine.Name,
+			elo, math.Abs(math.Max(upper-elo, elo-lower)),
+			score.Wins, score.Losses, score.Draws,
+			score.Wins+score.Losses+score.Draws)
+	}
+	fmt.Println("╚══════════════════════════════════════════════════════════╝")
 }
 
 type Result struct {

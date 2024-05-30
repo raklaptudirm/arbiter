@@ -17,12 +17,12 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 func NewEngine(config EngineConfig) (*Player, error) {
@@ -41,8 +41,6 @@ func NewEngine(config EngineConfig) (*Player, error) {
 	engine.reader = bufio.NewReader(stdout)
 	engine.lines = make(chan string)
 
-	engine.logger = os.Stderr
-
 	engine.Cmd = process
 
 	return &engine, nil
@@ -60,8 +58,7 @@ type Player struct {
 
 	lines chan string
 
-	logger io.Writer
-	err    error
+	err error
 }
 
 func (engine *Player) Start() error {
@@ -80,7 +77,7 @@ func (engine *Player) Start() error {
 
 			line = strings.Trim(line, " \n\t\r")
 
-			engine.logf("info: ("+engine.config.Name+")> %s\n", line)
+			logrus.Debugf("info: ("+engine.config.Name+")> %s\n", line)
 			engine.lines <- line
 		}
 	}()
@@ -220,15 +217,11 @@ func (engine *Player) Await(pattern string, timeout time.Duration) (string, erro
 }
 
 func (engine *Player) Write(format string, a ...any) error {
-	engine.logf("info: ("+engine.config.Name+")< "+format+"\n", a...)
+	logrus.Debugf("info: ("+engine.config.Name+")< "+format+"\n", a...)
 
 	if _, err := fmt.Fprintf(engine.writer, format+"\n", a...); err != nil {
 		return err
 	}
 
 	return engine.writer.Flush()
-}
-
-func (engine *Player) logf(format string, a ...any) {
-	fmt.Fprintf(engine.logger, format, a...)
 }
