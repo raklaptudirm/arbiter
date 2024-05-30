@@ -106,9 +106,7 @@ func (tour *Tournament) Start() error {
 					p1, p2 = p2, p1
 				}
 
-				if encounter%2 == 1 {
-					tour.openings.Next()
-				}
+				tour.openings.Next()
 			}
 		}
 	}
