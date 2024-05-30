@@ -39,6 +39,7 @@ func NewTournament(config Config) (*Tournament, error) {
 	}
 
 	tour.games = make(chan *Game)
+	tour.results = make(chan Result)
 
 	switch config.Scheduler {
 	case "round-robin", "":
@@ -56,7 +57,8 @@ type Tournament struct {
 	Scheduler Scheduler
 	openings  *Book
 
-	games chan *Game
+	games   chan *Game
+	results chan Result
 
 	Games  int
 	Scores []struct {
@@ -65,6 +67,7 @@ type Tournament struct {
 }
 
 func (tour *Tournament) Start() error {
+	go tour.ResultHandler()
 	for i := 0; i < tour.Config.Concurrency; i++ {
 		go tour.Thread()
 	}
@@ -126,32 +129,63 @@ func (tour *Tournament) RunGame(game *Game) error {
 		return err
 	}
 
-	switch score {
-	case common.Player1Wins:
-		tour.Scores[game.Player1].Wins++
-		tour.Scores[game.Player2].Losses++
-
-	case common.Player2Wins:
-		tour.Scores[game.Player2].Wins++
-		tour.Scores[game.Player1].Losses++
-
-	case common.Draw:
-		tour.Scores[game.Player1].Draws++
-		tour.Scores[game.Player2].Draws++
+	tour.results <- Result{
+		Player1: game.Player1,
+		Player2: game.Player2,
+		Result:  score,
 	}
 
-	fmt.Println("    Name               Elo Err   Wins Loss Draw   Total")
-	for i, engine := range tour.Config.Engines {
-		score := tour.Scores[i]
-		lower, elo, upper := stats.Elo(score.Wins, score.Draws, score.Losses)
-		fmt.Printf(
-			"%2d. %-15s   %+4.0f %3.0f   %4d %4d %4d   %5d\n",
-			i+1, engine.Name,
-			elo, math.Max(upper-elo, elo-lower),
-			score.Wins, score.Losses, score.Draws,
-			score.Wins+score.Losses+score.Draws)
-	}
 	return nil
+}
+
+func (tour *Tournament) ResultHandler() {
+	result_count := 0
+	for result := range tour.results {
+		result_count++
+
+		switch result.Result {
+		case common.Player1Wins:
+			tour.Scores[result.Player1].Wins++
+			tour.Scores[result.Player2].Losses++
+
+		case common.Player2Wins:
+			tour.Scores[result.Player2].Wins++
+			tour.Scores[result.Player1].Losses++
+
+		case common.Draw:
+			tour.Scores[result.Player1].Draws++
+			tour.Scores[result.Player2].Draws++
+		}
+
+		if result_count%5 == 0 {
+			fmt.Println("╔══════════════════════════════════════════════════════════╗")
+			fmt.Println("║    Name               Elo Error   Wins Loss Draw   Total ║")
+			fmt.Println("╠══════════════════════════════════════════════════════════╣")
+			for i, engine := range tour.Config.Engines {
+				score := tour.Scores[i]
+				lower, elo, upper := stats.Elo(score.Wins, score.Draws, score.Losses)
+				fmt.Printf(
+					"║ %2d. %-15s   %+4.0f %4.0f   %4d %4d %4d   %5d ║\n",
+					i+1, engine.Name,
+					elo, math.Abs(math.Max(upper-elo, elo-lower)),
+					score.Wins, score.Losses, score.Draws,
+					score.Wins+score.Losses+score.Draws)
+			}
+			fmt.Println("╚══════════════════════════════════════════════════════════╝")
+		}
+
+		if result_count == tour.Scheduler.TotalGames()*tour.Config.Rounds {
+			close(tour.results)
+			return
+		}
+	}
+
+}
+
+type Result struct {
+	Player1, Player2 int
+
+	Result common.Score
 }
 
 type Config struct {

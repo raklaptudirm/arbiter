@@ -208,15 +208,3 @@ func (game *Game) Play() (Score, error) {
 		}
 	}
 }
-
-type Result struct {
-	Score  Score
-	Reason string
-}
-
-const (
-	DrawByAdjudication         = "Draw by adjudication"
-	DrawByFiftyMoveRule        = "Draw by 50 move rule"
-	DrawByInsufficientMaterial = "Draw by insufficient material"
-	DrawByStalemate            = ""
-)
