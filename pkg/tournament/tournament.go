@@ -15,7 +15,9 @@ package tournament
 
 import (
 	"fmt"
+	"math"
 
+	"laptudirm.com/x/arbiter/pkg/stats"
 	"laptudirm.com/x/arbiter/pkg/tournament/common"
 	"laptudirm.com/x/arbiter/pkg/tournament/games"
 )
@@ -98,9 +100,16 @@ func (tour *Tournament) Start() error {
 				tour.Scores[p2].Draws++
 			}
 
-			fmt.Println("    Name              Ws   Ls   Ds   Total")
+			fmt.Println("    Name              Elo Err   Wins Loss Draw   Total")
 			for i, engine := range tour.Config.Engines {
-				fmt.Printf("%2d. %15s  %4d %4d %4d  %5d\n", i+1, engine.Name, tour.Scores[i].Wins, tour.Scores[i].Losses, tour.Scores[i].Draws, tour.Scores[i].Wins+tour.Scores[i].Losses+tour.Scores[i].Draws)
+				score := tour.Scores[i]
+				elo, bound, _ := stats.Elo(score.Wins, score.Draws, score.Losses)
+				fmt.Printf(
+					"%2d. %-15s   %3.0f %3.0f   %4d %4d %4d   %5d\n",
+					i+1, engine.Name,
+					elo, math.Abs(bound-elo),
+					score.Wins, score.Losses, score.Draws,
+					score.Wins+score.Losses+score.Draws)
 			}
 
 			if game_num%2 == 1 {
