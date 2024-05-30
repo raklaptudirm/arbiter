@@ -16,6 +16,7 @@ package tournament
 import (
 	"fmt"
 	"math"
+	"os"
 
 	"github.com/sirupsen/logrus"
 	"laptudirm.com/x/arbiter/pkg/stats"
@@ -40,6 +41,7 @@ func NewTournament(config Config) (*Tournament, error) {
 
 	tour.games = make(chan *Game)
 	tour.results = make(chan Result)
+	tour.complete = make(chan bool)
 
 	switch config.Scheduler {
 	case "round-robin", "":
@@ -57,8 +59,9 @@ type Tournament struct {
 	Scheduler Scheduler
 	openings  *Book
 
-	games   chan *Game
-	results chan Result
+	games    chan *Game
+	results  chan Result
+	complete chan bool
 
 	Games  int
 	Scores []struct {
@@ -102,6 +105,7 @@ func (tour *Tournament) Start() error {
 	}
 
 	close(tour.games)
+	<-tour.complete
 
 	return nil
 }
@@ -124,15 +128,16 @@ func (tour *Tournament) RunGame(game *Game) error {
 		tour.openings.Current(),
 	)
 
-	score, err := game.Play()
-	if err != nil {
-		return err
-	}
+	score, reason := game.Play()
 
 	tour.results <- Result{
+		Game: game,
+
 		Player1: game.Player1,
 		Player2: game.Player2,
-		Result:  score,
+
+		Result: score,
+		Reason: reason,
 	}
 
 	return nil
@@ -157,6 +162,15 @@ func (tour *Tournament) ResultHandler() {
 			tour.Scores[result.Player2].Draws++
 		}
 
+		fmt.Fprintf(os.Stderr,
+			"Round #%d Game #%d: %s vs %s: %s\n",
+			result.Game.Round,
+			result.Game.Number,
+			result.Game.Engines[0].config.Name,
+			result.Game.Engines[1].config.Name,
+			result,
+		)
+
 		if result_count%5 == 0 {
 			fmt.Println("╔══════════════════════════════════════════════════════════╗")
 			fmt.Println("║    Name               Elo Error   Wins Loss Draw   Total ║")
@@ -176,6 +190,7 @@ func (tour *Tournament) ResultHandler() {
 
 		if result_count == tour.Scheduler.TotalGames()*tour.Config.Rounds {
 			close(tour.results)
+			tour.complete <- true
 			return
 		}
 	}
@@ -183,9 +198,25 @@ func (tour *Tournament) ResultHandler() {
 }
 
 type Result struct {
+	Game *Game
+
 	Player1, Player2 int
 
 	Result common.Score
+	Reason string
+}
+
+func (result Result) String() string {
+	switch result.Result {
+	case common.Player1Wins:
+		return fmt.Sprintf("%s wins by %s", result.Game.Engines[0].config.Name, result.Reason)
+	case common.Player2Wins:
+		return fmt.Sprintf("%s wins by %s", result.Game.Engines[1].config.Name, result.Reason)
+	case common.Draw:
+		return fmt.Sprintf("Draw by %s", result.Reason)
+	}
+
+	return "illegal result"
 }
 
 type Config struct {

@@ -47,20 +47,22 @@ func (oracle *ChessOracle) ZeroMoves() bool {
 	return oracle.board.DrawClock == 0
 }
 
-func (oracle *ChessOracle) GameResult() Result {
+func (oracle *ChessOracle) GameResult() (Result, string) {
 	switch {
 	case len(oracle.moves) == 0:
 		if oracle.board.IsInCheck(oracle.board.SideToMove) {
-			return XtmWins
+			return XtmWins, "Checkmate"
 		}
 
-		fallthrough
+		return Draw, "Stalemate"
 
-	case oracle.board.DrawClock >= 100,
-		oracle.board.IsThreefoldRepetition(),
-		oracle.board.IsInsufficientMaterial():
-		return Draw
+	case oracle.board.DrawClock >= 100:
+		return Draw, "50-move Rule"
+	case oracle.board.IsThreefoldRepetition():
+		return Draw, "Threefold Repetition"
+	case oracle.board.IsInsufficientMaterial():
+		return Draw, "Insufficient Material"
 	}
 
-	return Ongoing
+	return Ongoing, ""
 }

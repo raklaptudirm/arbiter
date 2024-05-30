@@ -124,22 +124,22 @@ type Game struct {
 	Increment [2]time.Duration
 }
 
-func (game *Game) Play() (Score, error) {
+func (game *Game) Play() (Score, string) {
 	if err := game.Engines[0].Start(); err != nil {
-		return 0, err
+		return Player2Wins, err.Error()
 	}
 	if err := game.Engines[1].Start(); err != nil {
-		return 0, err
+		return Player1Wins, err.Error()
 	}
 
 	defer game.Engines[0].Kill()
 	defer game.Engines[1].Kill()
 
 	if err := game.Engines[0].NewGame(); err != nil {
-		return Player2Wins, err
+		return Player2Wins, err.Error()
 	}
 	if err := game.Engines[1].NewGame(); err != nil {
-		return Player1Wins, err
+		return Player1Wins, err.Error()
 	}
 
 	if game.Oracle != nil {
@@ -151,11 +151,11 @@ func (game *Game) Play() (Score, error) {
 		engine := game.Engines[sideToMove]
 
 		if err := engine.Write("position fen %s moves%s", game.StartFEN, game.moves); err != nil {
-			return GameLostBy[sideToMove], err
+			return GameLostBy[sideToMove], err.Error()
 		}
 
 		if err := engine.Synchronize(); err != nil {
-			return GameLostBy[sideToMove], err
+			return GameLostBy[sideToMove], err.Error()
 		}
 
 		if err := engine.Write(
@@ -165,7 +165,7 @@ func (game *Game) Play() (Score, error) {
 			game.Increment[0].Milliseconds(),
 			game.Increment[1].Milliseconds(),
 		); err != nil {
-			return GameLostBy[sideToMove], err
+			return GameLostBy[sideToMove], err.Error()
 		}
 
 		startTime := time.Now()
@@ -178,7 +178,7 @@ func (game *Game) Play() (Score, error) {
 		game.TotalTime[sideToMove] += game.Increment[sideToMove]
 
 		if err != nil {
-			return GameLostBy[sideToMove], err
+			return GameLostBy[sideToMove], err.Error()
 		}
 
 		bestmove := strings.Fields(line)[1]
@@ -189,16 +189,17 @@ func (game *Game) Play() (Score, error) {
 		if game.Oracle != nil {
 			err := game.Oracle.MakeMove(bestmove)
 			if err != nil {
-				return GameLostBy[sideToMove], err
+				return GameLostBy[sideToMove], err.Error()
 			}
 
-			switch game.Oracle.GameResult() {
+			result, reason := game.Oracle.GameResult()
+			switch result {
 			case games.StmWins:
-				return Player1Wins - Score(2*sideToMove), nil
+				return Player1Wins - Score(2*sideToMove), reason
 			case games.XtmWins:
-				return Player2Wins + Score(2*sideToMove), nil
+				return Player2Wins + Score(2*sideToMove), reason
 			case games.Draw:
-				return Draw, nil
+				return Draw, reason
 			}
 
 			if game.Oracle.ZeroMoves() {
