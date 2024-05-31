@@ -13,7 +13,9 @@
 
 package stats
 
-import "math"
+import (
+	"math"
+)
 
 // SPRT does a statistical probability ratio test calculation on the given
 // number of wins, draws, and losses from the tournament and returns the

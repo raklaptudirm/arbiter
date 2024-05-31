@@ -1,5 +1,6 @@
 package match
 
+// Result represents the result of a single match.
 type Result int
 
 const (
@@ -8,11 +9,13 @@ const (
 	Player2Wins Result = -1
 )
 
+// GameLostBy maps the losing player to the match's Result.
 var GameLostBy = [2]Result{
 	0: Player2Wins,
 	1: Player1Wins,
 }
 
+// String returns a string representation of the given Result.
 func (result Result) String() string {
 	switch result {
 	case Player1Wins:

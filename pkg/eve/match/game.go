@@ -22,7 +22,8 @@ import (
 
 type Config struct {
 	Game, PositionFEN string
-	Engines           [2]EngineConfig
+
+	Engines [2]EngineConfig
 }
 
 func Run(config *Config) (Result, string) {
