@@ -38,7 +38,7 @@ func SPRT(ws, ds, ls float64, elo0, elo1 float64) (llr float64) {
 }
 
 func PentaSPRT(lls, lds, wldds, wds, wws int, elo0, elo1 float64) (llr float64) {
-	N := float64(lls + lds + wldds + wds + wws) // total number of games
+	N := float64(lls + lds + wldds + wds + wws) // total number of pairs
 
 	if N == 0 {
 		return 0
