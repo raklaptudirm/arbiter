@@ -13,9 +13,7 @@
 
 package stats
 
-import (
-	"math"
-)
+import "math"
 
 // SPRT does a statistical probability ratio test calculation on the given
 // number of wins, draws, and losses from the tournament and returns the
@@ -39,6 +37,46 @@ func SPRT(ws, ds, ls float64, elo0, elo1 float64) (llr float64) {
 		ls*math.Log(l1/l0)
 }
 
+func PentaSPRT(lls, lds, wldds, wds, wws int, elo0, elo1 float64) (llr float64) {
+	N := float64(lls + lds + wldds + wds + wws) // total number of games
+
+	if N == 0 {
+		return 0
+	}
+
+	ll := float64(lls) / N     // measured loss-loss probability
+	ld := float64(lds) / N     // measured loss-draw probability
+	wldd := float64(wldds) / N // measured win-loss/draw-draw probability
+	wd := float64(wds) / N     // measured win-draw probability
+	ww := float64(wws) / N     // measured win-win probability
+
+	// empirical mean of random variable
+	mu := ww + 0.75*wd + 0.5*wldd + 0.25*ld
+
+	// standard deviation (multiplied by sqrt of N) of the random variable
+	r := math.Sqrt(ww*math.Pow(1-mu, 2) + wd*math.Pow(0.75-mu, 2) + wldd*math.Pow(0.5-mu, 2) + ld*math.Pow(0.25-mu, 2) + ll*math.Pow(0-mu, 2))
+	if r == 0 {
+		return 0
+	}
+
+	// convert elo bounds to score
+	mu0 := neloToScore(elo0, r)
+	mu1 := neloToScore(elo1, r)
+
+	// deviation to the score bounds
+	r0 := math.Sqrt(ww*math.Pow(1-mu0, 2) + wd*math.Pow(0.75-mu0, 2) + wldd*math.Pow(0.5-mu0, 2) + ld*math.Pow(0.25-mu0, 2) + ll*math.Pow(0-mu0, 2))
+	r1 := math.Sqrt(ww*math.Pow(1-mu1, 2) + wd*math.Pow(0.75-mu1, 2) + wldd*math.Pow(0.5-mu1, 2) + ld*math.Pow(0.25-mu1, 2) + ll*math.Pow(0-mu1, 2))
+
+	if r0 == 0 || r1 == 0 {
+		return 0
+	}
+
+	// log-likelihood ratio (llr)
+	// note: this is not the exact llr formula but rather a simplified yet
+	// very accurate approximation. see http://hardy.uhasselt.be/Fishtest/support_MLE_multinomial.pdf
+	return 0.5 * N * math.Log(r0/r1)
+}
+
 // Elo returns the likely elo of the target player along with its p < 0.05
 // upper bound and lower bound, called mu, muMax, and muMin respectively.
 func Elo(ws, ds, ls int) (muMin float64, mu float64, muMax float64) {
@@ -58,16 +96,41 @@ func Elo(ws, ds, ls int) (muMin float64, mu float64, muMax float64) {
 	// standard deviation of the random variable
 	sigma := math.Sqrt(w*math.Pow(1-mu, 2)+d*math.Pow(0.5-mu, 2)+l*math.Pow(0-mu, 2)) / math.Sqrt(N)
 
-	muMax = clampElo(mu + phiInv(0.025)*sigma) // upper bound
-	muMin = clampElo(mu + phiInv(0.975)*sigma) // lower bound
+	muMax = mu + phiInv(0.025)*sigma // upper bound
+	muMin = mu + phiInv(0.975)*sigma // lower bound
 
-	return muMin, clampElo(mu), muMax
+	return clampElo(muMin), clampElo(mu), clampElo(muMax)
 }
 
 func StoppingBounds(alpha, beta float64) (lower float64, upper float64) {
 	lower = math.Log(beta / (1 - alpha))
 	upper = math.Log((1 - beta) / alpha)
 	return
+}
+
+func PentaElo(lls, lds, wldds, wds, wws int) (muMin float64, mu float64, muMax float64) {
+	N := float64(lls + lds + wldds + wds + wws) // total number of pairs
+
+	if N == 0 {
+		return 0, 0, 0
+	}
+
+	ll := float64(lls) / N     // measured loss-loss probability
+	ld := float64(lds) / N     // measured loss-draw probability
+	wldd := float64(wldds) / N // measured win-loss/draw-draw probability
+	wd := float64(wds) / N     // measured win-draw probability
+	ww := float64(wws) / N     // measured win-win probability
+
+	// empirical mean of random variable
+	mu = ww + 0.75*wd + 0.5*wldd + 0.25*ld
+
+	// standard deviation of the random variable
+	sigma := math.Sqrt(ww*math.Pow(1-mu, 2)+wd*math.Pow(0.75-mu, 2)+wldd*math.Pow(0.5-mu, 2)+ld*math.Pow(0.25-mu, 2)+ll*math.Pow(0-mu, 2)) / math.Sqrt(N)
+
+	muMax = mu + phiInv(0.025)*sigma // upper bound
+	muMin = mu + phiInv(0.975)*sigma // lower bound
+
+	return clampElo(muMin), clampElo(mu), clampElo(muMax)
 }
 
 func clampElo(x float64) float64 {
@@ -97,4 +160,8 @@ func wdlToElo(w, d, l float64) (elo float64, dlo float64) {
 
 func phiInv(p float64) float64 {
 	return math.Sqrt2 * math.Erfinv(2*p-1)
+}
+
+func neloToScore(nelo, r float64) float64 {
+	return nelo*math.Sqrt2*r/(800/math.Ln10) + 0.5
 }
