@@ -150,7 +150,7 @@ func (engine *Engine) Kill() error {
 		return err
 	}
 
-	return engine.Process.Kill()
+	return engine.Wait()
 }
 
 var ErrReadTimeout = errors.New("engine: read i/o timeout")
