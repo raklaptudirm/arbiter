@@ -64,8 +64,8 @@ func PentaSPRT(lls, lds, wldds, wds, wws int, elo0, elo1 float64) (llr float64) 
 	mu1 := neloToScore(elo1, r)
 
 	// deviation to the score bounds
-	r0 := math.Sqrt(ww*math.Pow(1-mu0, 2) + wd*math.Pow(0.75-mu0, 2) + wldd*math.Pow(0.5-mu0, 2) + ld*math.Pow(0.25-mu0, 2) + ll*math.Pow(0-mu0, 2))
-	r1 := math.Sqrt(ww*math.Pow(1-mu1, 2) + wd*math.Pow(0.75-mu1, 2) + wldd*math.Pow(0.5-mu1, 2) + ld*math.Pow(0.25-mu1, 2) + ll*math.Pow(0-mu1, 2))
+	r0 := ww*math.Pow(1-mu0, 2) + wd*math.Pow(0.75-mu0, 2) + wldd*math.Pow(0.5-mu0, 2) + ld*math.Pow(0.25-mu0, 2) + ll*math.Pow(0-mu0, 2)
+	r1 := ww*math.Pow(1-mu1, 2) + wd*math.Pow(0.75-mu1, 2) + wldd*math.Pow(0.5-mu1, 2) + ld*math.Pow(0.25-mu1, 2) + ll*math.Pow(0-mu1, 2)
 
 	if r0 == 0 || r1 == 0 {
 		return 0
