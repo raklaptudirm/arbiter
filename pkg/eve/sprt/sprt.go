@@ -223,9 +223,9 @@ func (sprt *SPRT) Report() {
 	if !sprt.Config.Legacy {
 		penta_str := fmt.Sprintf(
 			"║ PENTA | [%d, %d, %d, %d, %d]",
-			sprt.State.WinWin, sprt.State.WinDraw,
+			sprt.State.LossLoss, sprt.State.DrawLoss,
 			sprt.State.DrawDraw,
-			sprt.State.DrawLoss, sprt.State.LossLoss,
+			sprt.State.WinDraw, sprt.State.WinWin,
 		)
 		fmt.Printf("%-50s║\n", penta_str)
 	}
