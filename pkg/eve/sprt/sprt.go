@@ -158,9 +158,9 @@ func (sprt *SPRT) ResultHandler() {
 			sprt.State.LossLoss++
 		}
 
-		for _, result := range pair.Matches {
-			result_count++
+		result_count++
 
+		for _, result := range pair.Matches {
 			switch result.Result {
 			case match.Win:
 				sprt.State.Wins++
@@ -177,26 +177,26 @@ func (sprt *SPRT) ResultHandler() {
 				result.Match.Engines[1].Name,
 				result,
 			)
-
-			if result_count%5 == 0 {
-				sprt.Report()
-			}
-
-			if llr := sprt.LLR(); llr <= sprt.a {
-				fmt.Println("\n\x1b[31mH0 Accepted")
-			} else if llr >= sprt.b {
-				fmt.Println("\n\x1b[32mH1 Accepted")
-			} else {
-				continue
-			}
-
-			sprt.Report()
-
-			fmt.Print("\x1b[0m")
-			close(sprt.results)
-			sprt.complete <- true
-			return
 		}
+
+		if result_count%5 == 0 {
+			sprt.Report()
+		}
+
+		if llr := sprt.LLR(); llr <= sprt.a {
+			fmt.Println("\n\x1b[31mH0 Accepted")
+		} else if llr >= sprt.b {
+			fmt.Println("\n\x1b[32mH1 Accepted")
+		} else {
+			continue
+		}
+
+		sprt.Report()
+
+		fmt.Print("\x1b[0m")
+		close(sprt.results)
+		sprt.complete <- true
+		return
 	}
 
 }
