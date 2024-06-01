@@ -40,4 +40,7 @@ func TryCreate(file string, data []byte) {
 
 func init() {
 	TryMkdir(Directory)
+	TryMkdir(filepath.Join(Directory, "paused"))
+	TryMkdir(filepath.Join(Directory, "paused", "sprt"))
+	TryMkdir(filepath.Join(Directory, "paused", "tour"))
 }

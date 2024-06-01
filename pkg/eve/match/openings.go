@@ -10,7 +10,7 @@ type OpeningConfig struct {
 	File string
 	// Format string // only EPD opening files supported.
 	Order string
-	Start int
+	Start uint64
 }
 
 // NewBook opens the opening book with the given configuration.
@@ -19,7 +19,7 @@ func NewBook(config OpeningConfig) (*OpeningBook, error) {
 
 	book.prng.Seed(config.Start)
 	if config.Start == 0 {
-		book.prng.Seed(int(time.Now().UnixMilli()))
+		book.prng.Seed(uint64(time.Now().UnixMilli()))
 	}
 
 	// Read the opening book file.
@@ -51,15 +51,21 @@ type OpeningBook struct {
 func (book *OpeningBook) Next() {
 	switch book.Order {
 	case "random":
-		book.Start = int(book.prng.Uint64() % uint64(len(book.entries)))
+		book.Start = book.prng.Uint64() % uint64(len(book.entries))
 	default:
-		book.Start = (book.Start + 1) % len(book.entries)
+		book.Start = (book.Start + 1) % uint64(len(book.entries))
 	}
 }
 
 // Current returns the currently selected opening.
 func (book *OpeningBook) Current() string {
 	return book.entries[book.Start]
+}
+
+func (book *OpeningBook) Wrap() OpeningConfig {
+	config := book.OpeningConfig
+	config.Start = book.prng.seed
+	return config
 }
 
 // xorshift64star Pseudo-Random Number Generator
@@ -82,7 +88,7 @@ type prng struct {
 }
 
 // Seed seeds the pseudo-random number generator with the given uint.
-func (p *prng) Seed(s int) {
+func (p *prng) Seed(s uint64) {
 	p.seed = uint64(s)
 }
 

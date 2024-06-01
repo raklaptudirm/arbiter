@@ -51,6 +51,7 @@ func Root() *cobra.Command {
 	root.AddCommand(Remove())
 	root.AddCommand(Tournament())
 	root.AddCommand(SPRT())
+	root.AddCommand(Restart())
 
 	return root
 }

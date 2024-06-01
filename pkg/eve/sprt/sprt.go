@@ -16,8 +16,12 @@ package sprt
 import (
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
+	arbiter "laptudirm.com/x/arbiter/pkg/common"
 	"laptudirm.com/x/arbiter/pkg/eve/match"
 	"laptudirm.com/x/arbiter/pkg/eve/stats"
 )
@@ -39,7 +43,7 @@ func NewTournament(config Config) (*SPRT, error) {
 }
 
 type SPRT struct {
-	Config Config
+	Config
 
 	openings *match.OpeningBook
 
@@ -50,11 +54,6 @@ type SPRT struct {
 	ended  bool
 
 	a, b float64
-
-	Score struct {
-		Wins, Losses, Draws                           int
-		WinWin, WinDraw, DrawDraw, DrawLoss, LossLoss int
-	}
 }
 
 func (sprt *SPRT) Start() error {
@@ -148,15 +147,15 @@ func (sprt *SPRT) ResultHandler() {
 	for pair := range sprt.results {
 		switch pair.Result {
 		case match.WinWin:
-			sprt.Score.WinWin++
+			sprt.State.WinWin++
 		case match.WinDraw:
-			sprt.Score.WinDraw++
+			sprt.State.WinDraw++
 		case match.DrawDraw:
-			sprt.Score.DrawDraw++
+			sprt.State.DrawDraw++
 		case match.DrawLoss:
-			sprt.Score.DrawLoss++
+			sprt.State.DrawLoss++
 		case match.LossLoss:
-			sprt.Score.LossLoss++
+			sprt.State.LossLoss++
 		}
 
 		for _, result := range pair.Matches {
@@ -164,11 +163,11 @@ func (sprt *SPRT) ResultHandler() {
 
 			switch result.Result {
 			case match.Win:
-				sprt.Score.Wins++
+				sprt.State.Wins++
 			case match.Loss:
-				sprt.Score.Losses++
+				sprt.State.Losses++
 			case match.Draw:
-				sprt.Score.Draws++
+				sprt.State.Draws++
 			}
 
 			logrus.Infof(
@@ -203,16 +202,19 @@ func (sprt *SPRT) ResultHandler() {
 }
 
 func (sprt *SPRT) Report() {
-	lower, elo, upper := stats.Elo(sprt.Score.Wins, sprt.Score.Draws, sprt.Score.Losses)
+	data, _ := yaml.Marshal(sprt.Wrap())
+	os.WriteFile(filepath.Join(arbiter.Directory, "paused", "sprt", sprt.Name), data, 0777)
+
+	lower, elo, upper := stats.Elo(sprt.State.Wins, sprt.State.Draws, sprt.State.Losses)
 	err := math.Abs(math.Max(upper-elo, elo-lower))
 
-	n := sprt.Score.Wins + sprt.Score.Losses + sprt.Score.Draws
+	n := sprt.State.Wins + sprt.State.Losses + sprt.State.Draws
 
 	llr := sprt.LLR()
 
 	elo_str := fmt.Sprintf("║ ELO   | %.2f +- %.2f (95%%)", elo, err)
 	llr_str := fmt.Sprintf("║ LLR   | %.2f (%.2f, %.2f) [%.2f, %.2f]", llr, sprt.a, sprt.b, sprt.Config.Elo0, sprt.Config.Elo1)
-	gam_str := fmt.Sprintf("║ GAMES | N: %d W: %d L: %d D: %d", n, sprt.Score.Wins, sprt.Score.Losses, sprt.Score.Draws)
+	gam_str := fmt.Sprintf("║ GAMES | N: %d W: %d L: %d D: %d", n, sprt.State.Wins, sprt.State.Losses, sprt.State.Draws)
 
 	fmt.Println("╔═════════════════════════════════════════════════╗")
 	fmt.Printf("%-50s║\n", elo_str)
@@ -221,9 +223,9 @@ func (sprt *SPRT) Report() {
 	if !sprt.Config.Legacy {
 		penta_str := fmt.Sprintf(
 			"║ PENTA | [%d, %d, %d, %d, %d]",
-			sprt.Score.WinWin, sprt.Score.WinDraw,
-			sprt.Score.DrawDraw,
-			sprt.Score.DrawLoss, sprt.Score.LossLoss,
+			sprt.State.WinWin, sprt.State.WinDraw,
+			sprt.State.DrawDraw,
+			sprt.State.DrawLoss, sprt.State.LossLoss,
 		)
 		fmt.Printf("%-50s║\n", penta_str)
 	}
@@ -233,23 +235,29 @@ func (sprt *SPRT) Report() {
 func (sprt *SPRT) LLR() float64 {
 	if sprt.Config.Legacy {
 		return stats.SPRT(
-			sprt.Score.Wins,
-			sprt.Score.Draws,
-			sprt.Score.Losses,
+			sprt.State.Wins,
+			sprt.State.Draws,
+			sprt.State.Losses,
 			sprt.Config.Elo0,
 			sprt.Config.Elo1,
 		)
 	}
 
 	return stats.PentaSPRT(
-		sprt.Score.LossLoss,
-		sprt.Score.DrawLoss,
-		sprt.Score.DrawDraw,
-		sprt.Score.WinDraw,
-		sprt.Score.WinWin,
+		sprt.State.LossLoss,
+		sprt.State.DrawLoss,
+		sprt.State.DrawDraw,
+		sprt.State.WinDraw,
+		sprt.State.WinWin,
 		sprt.Config.Elo0,
 		sprt.Config.Elo1,
 	)
+}
+
+func (sprt *SPRT) Wrap() Config {
+	config := sprt.Config
+	sprt.Openings = sprt.openings.Wrap()
+	return config
 }
 
 type PairResult struct {
@@ -278,6 +286,8 @@ func (result Result) String() string {
 }
 
 type Config struct {
+	Name string
+
 	// The engines participating in the tournament.
 	Engines [2]match.EngineConfig `yaml:"engines"`
 
@@ -306,9 +316,11 @@ type Config struct {
 
 	Openings match.OpeningConfig
 
-	PGNOut string // File to store the game PGNs at.
-	EPDOut string // File to store the game ends EPD at.
+	// PGNOut string // File to store the game PGNs at.
+	// EPDOut string // File to store the game ends EPD at.
 
-	// Restart a crashed engine instead of stopping the match.
-	Recover bool
+	State struct {
+		Wins, Losses, Draws                           int
+		WinWin, WinDraw, DrawDraw, DrawLoss, LossLoss int
+	}
 }
