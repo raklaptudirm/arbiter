@@ -233,11 +233,11 @@ func (sprt *SPRT) Report() {
 func (sprt *SPRT) LLR() float64 {
 	if sprt.Config.Legacy {
 		return stats.SPRT(
-			float64(sprt.Score.Wins),
-			float64(sprt.Score.Draws),
-			float64(sprt.Score.Losses),
-			float64(sprt.Config.Elo0),
-			float64(sprt.Config.Elo1),
+			sprt.Score.Wins,
+			sprt.Score.Draws,
+			sprt.Score.Losses,
+			sprt.Config.Elo0,
+			sprt.Config.Elo1,
 		)
 	}
 
