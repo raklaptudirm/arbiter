@@ -1,5 +1,19 @@
 package match
 
+type PairResult int
+
+const (
+	WinWin   PairResult = 2
+	WinDraw  PairResult = 1
+	DrawDraw PairResult = 0
+	DrawLoss PairResult = -1
+	LossLoss PairResult = -2
+)
+
+func GetPairResult(result1, result2 Result) PairResult {
+	return PairResult(result1) + PairResult(result2)
+}
+
 // Result represents the result of a single match.
 type Result int
 

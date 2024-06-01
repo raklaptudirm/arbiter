@@ -52,7 +52,8 @@ type SPRT struct {
 	a, b float64
 
 	Score struct {
-		Wins, Losses, Draws int
+		Wins, Losses, Draws                           int
+		WinWin, WinDraw, DrawDraw, DrawLoss, LossLoss int
 	}
 }
 
@@ -72,6 +73,8 @@ func (sprt *SPRT) Thread() {
 	for !sprt.ended {
 		sprt.openings.Next()
 		opening := sprt.openings.Current()
+
+		var pair PairResult
 
 		p1, p2 := 0, 1
 		for game := 0; game < 2; game++ {
@@ -93,12 +96,21 @@ func (sprt *SPRT) Thread() {
 				Player2: p2,
 			}
 
-			if err := sprt.RunGame(&match); err != nil {
+			result, err := sprt.RunGame(&match)
+			if err != nil {
 				logrus.Error(err)
 			}
 
+			sprt.results <- result
+			pair.Matches[game] = result
+
 			p1, p2 = p2, p1
 		}
+
+		pair.Result = match.GetPairResult(
+			pair.Matches[0].Result,
+			pair.Matches[1].Result,
+		)
 	}
 }
 
@@ -109,7 +121,7 @@ type Match struct {
 	Player1, Player2 int
 }
 
-func (sprt *SPRT) RunGame(game *Match) error {
+func (sprt *SPRT) RunGame(game *Match) (Result, error) {
 	logrus.Infof(
 		"\x1b[33mStarting\x1b[0m Game #%d: %s vs %s (\x1b[33m%s\x1b[0m)\n",
 		game.Number,
@@ -119,14 +131,15 @@ func (sprt *SPRT) RunGame(game *Match) error {
 	)
 
 	score, reason := match.Run(&game.Config)
+	if game.Player2 == 0 {
+		score = -score
+	}
 
-	sprt.results <- Result{
+	return Result{
 		Match:  game,
 		Result: score,
 		Reason: reason,
-	}
-
-	return nil
+	}, nil
 }
 
 func (sprt *SPRT) ResultHandler() {
@@ -136,17 +149,9 @@ func (sprt *SPRT) ResultHandler() {
 
 		switch result.Result {
 		case match.Player1Wins:
-			if result.Match.Player1 == 0 {
-				sprt.Score.Wins++
-			} else {
-				sprt.Score.Losses++
-			}
+			sprt.Score.Wins++
 		case match.Player2Wins:
-			if result.Match.Player1 == 1 {
-				sprt.Score.Wins++
-			} else {
-				sprt.Score.Losses++
-			}
+			sprt.Score.Losses++
 		case match.Draw:
 			sprt.Score.Draws++
 		}
@@ -214,6 +219,11 @@ func (sprt *SPRT) Report() {
 	fmt.Println("╚═════════════════════════════════════════════════╝")
 }
 
+type PairResult struct {
+	Result  match.PairResult
+	Matches [2]Result
+}
+
 type Result struct {
 	Match *Match
 
@@ -224,9 +234,9 @@ type Result struct {
 func (result Result) String() string {
 	switch result.Result {
 	case match.Player1Wins:
-		return fmt.Sprintf("%s wins by %s", result.Match.Engines[0].Name, result.Reason)
+		return fmt.Sprintf("%s wins by %s", result.Match.Engines[result.Match.Player1].Name, result.Reason)
 	case match.Player2Wins:
-		return fmt.Sprintf("%s wins by %s", result.Match.Engines[1].Name, result.Reason)
+		return fmt.Sprintf("%s wins by %s", result.Match.Engines[result.Match.Player2].Name, result.Reason)
 	case match.Draw:
 		return fmt.Sprintf("Draw by %s", result.Reason)
 	}
