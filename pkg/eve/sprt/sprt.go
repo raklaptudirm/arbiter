@@ -32,7 +32,7 @@ func NewTournament(config Config) (*SPRT, error) {
 		return nil, err
 	}
 
-	sprt.results = make(chan Result)
+	sprt.results = make(chan PairResult)
 	sprt.complete = make(chan bool)
 
 	return &sprt, nil
@@ -43,7 +43,7 @@ type SPRT struct {
 
 	openings *match.OpeningBook
 
-	results  chan Result
+	results  chan PairResult
 	complete chan bool
 
 	number int
@@ -101,7 +101,6 @@ func (sprt *SPRT) Thread() {
 				logrus.Error(err)
 			}
 
-			sprt.results <- result
 			pair.Matches[game] = result
 
 			p1, p2 = p2, p1
@@ -111,6 +110,8 @@ func (sprt *SPRT) Thread() {
 			pair.Matches[0].Result,
 			pair.Matches[1].Result,
 		)
+
+		sprt.results <- pair
 	}
 }
 
@@ -144,52 +145,59 @@ func (sprt *SPRT) RunGame(game *Match) (Result, error) {
 
 func (sprt *SPRT) ResultHandler() {
 	result_count := 0
-	for result := range sprt.results {
-		result_count++
-
-		switch result.Result {
-		case match.Player1Wins:
-			sprt.Score.Wins++
-		case match.Player2Wins:
-			sprt.Score.Losses++
-		case match.Draw:
-			sprt.Score.Draws++
+	for pair := range sprt.results {
+		switch pair.Result {
+		case match.WinWin:
+			sprt.Score.WinWin++
+		case match.WinDraw:
+			sprt.Score.WinDraw++
+		case match.DrawDraw:
+			sprt.Score.DrawDraw++
+		case match.DrawLoss:
+			sprt.Score.DrawLoss++
+		case match.LossLoss:
+			sprt.Score.LossLoss++
 		}
 
-		logrus.Infof(
-			"\x1b[32mFinished\x1b[0m RGame #%d: %s vs %s: %s\n",
-			result.Match.Number,
-			result.Match.Engines[0].Name,
-			result.Match.Engines[1].Name,
-			result,
-		)
+		for _, result := range pair.Matches {
+			result_count++
 
-		if result_count%5 == 0 {
+			switch result.Result {
+			case match.Player1Wins:
+				sprt.Score.Wins++
+			case match.Player2Wins:
+				sprt.Score.Losses++
+			case match.Draw:
+				sprt.Score.Draws++
+			}
+
+			logrus.Infof(
+				"\x1b[32mFinished\x1b[0m Game #%d: %s vs %s: %s\n",
+				result.Match.Number,
+				result.Match.Engines[0].Name,
+				result.Match.Engines[1].Name,
+				result,
+			)
+
+			if result_count%5 == 0 {
+				sprt.Report()
+			}
+
+			if llr := sprt.LLR(); llr <= sprt.a {
+				fmt.Println("\n\x1b[31mH0 Accepted")
+			} else if llr >= sprt.b {
+				fmt.Println("\n\x1b[32mH1 Accepted")
+			} else {
+				continue
+			}
+
 			sprt.Report()
+
+			fmt.Print("\x1b[0m")
+			close(sprt.results)
+			sprt.complete <- true
+			return
 		}
-
-		llr := stats.SPRT(
-			float64(sprt.Score.Wins),
-			float64(sprt.Score.Draws),
-			float64(sprt.Score.Losses),
-			float64(sprt.Config.Elo0),
-			float64(sprt.Config.Elo1),
-		)
-
-		if llr <= sprt.a {
-			fmt.Println("\n\x1b[31mH0 Accepted")
-		} else if llr >= sprt.b {
-			fmt.Println("\n\x1b[32mH1 Accepted")
-		} else {
-			continue
-		}
-
-		sprt.Report()
-
-		fmt.Print("\x1b[0m")
-		close(sprt.results)
-		sprt.complete <- true
-		return
 	}
 
 }
@@ -200,13 +208,7 @@ func (sprt *SPRT) Report() {
 
 	n := sprt.Score.Wins + sprt.Score.Losses + sprt.Score.Draws
 
-	llr := stats.SPRT(
-		float64(sprt.Score.Wins),
-		float64(sprt.Score.Draws),
-		float64(sprt.Score.Losses),
-		float64(sprt.Config.Elo0),
-		float64(sprt.Config.Elo1),
-	)
+	llr := sprt.LLR()
 
 	elo_str := fmt.Sprintf("║ ELO   | %.2f +- %.2f (95%%)", elo, err)
 	llr_str := fmt.Sprintf("║ LLR   | %.2f (%.2f, %.2f) [%.2f, %.2f]", llr, sprt.a, sprt.b, sprt.Config.Elo0, sprt.Config.Elo1)
@@ -216,7 +218,38 @@ func (sprt *SPRT) Report() {
 	fmt.Printf("%-50s║\n", elo_str)
 	fmt.Printf("%-50s║\n", llr_str)
 	fmt.Printf("%-50s║\n", gam_str)
+	if !sprt.Config.Legacy {
+		penta_str := fmt.Sprintf(
+			"║ PENTA | [%d, %d, %d, %d, %d]",
+			sprt.Score.WinWin, sprt.Score.WinDraw,
+			sprt.Score.DrawDraw,
+			sprt.Score.DrawLoss, sprt.Score.LossLoss,
+		)
+		fmt.Printf("%-50s║\n", penta_str)
+	}
 	fmt.Println("╚═════════════════════════════════════════════════╝")
+}
+
+func (sprt *SPRT) LLR() float64 {
+	if sprt.Config.Legacy {
+		return stats.SPRT(
+			float64(sprt.Score.Wins),
+			float64(sprt.Score.Draws),
+			float64(sprt.Score.Losses),
+			float64(sprt.Config.Elo0),
+			float64(sprt.Config.Elo1),
+		)
+	}
+
+	return stats.PentaSPRT(
+		sprt.Score.LossLoss,
+		sprt.Score.DrawLoss,
+		sprt.Score.DrawDraw,
+		sprt.Score.WinDraw,
+		sprt.Score.WinWin,
+		sprt.Config.Elo0,
+		sprt.Config.Elo1,
+	)
 }
 
 type PairResult struct {
@@ -253,6 +286,8 @@ type Config struct {
 
 	// Number of games that will be played concurrently.
 	Concurrency int `yaml:"concurrency"`
+
+	Legacy bool `yaml:"legacy"`
 
 	// Game adjudication stuff.
 	// Draw        struct {
