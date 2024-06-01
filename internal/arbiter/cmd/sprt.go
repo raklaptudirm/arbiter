@@ -45,18 +45,6 @@ func SPRT() *cobra.Command {
 			}
 
 			return tour.Start()
-
-			// var rr sprt.RoundRobin
-			// rr.Initialize(tour)
-
-			// fmt.Printf("Total games: %d\n", rr.TotalGames())
-
-			// for game_num := 0; game_num < rr.TotalGames(); game_num++ {
-			// 	p1, p2 := rr.NextPair(game_num)
-			// 	fmt.Printf("Game #%d: %d vs %d\n", game_num, p1, p2)
-			// }
-
-			// return nil
 		},
 	}
 }
