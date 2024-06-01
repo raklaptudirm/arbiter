@@ -276,11 +276,6 @@ type Config struct {
 	Rounds    int `yaml:"rounds"`     // Number of rounds to run the tournament for.
 	GamePairs int `yaml:"game-pairs"` // Number of games per encounter in every round.
 
-	Sprt struct {
-		Elo0, Elo1  int // The null and the alternate elo hypotheses.
-		Alpha, Beta int // Confidence bounds for Error types I and II.
-	}
-
 	Openings match.OpeningConfig
 
 	PGNOut string // File to store the game PGNs at.
