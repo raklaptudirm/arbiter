@@ -235,7 +235,7 @@ func (result Result) String() string {
 }
 
 type Config struct {
-	// The engines participating in the sprtnament.
+	// The engines participating in the tournament.
 	Engines [2]match.EngineConfig `yaml:"engines"`
 
 	// The game that will be played.
