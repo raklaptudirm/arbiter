@@ -160,11 +160,11 @@ func (tour *Tournament) ResultHandler() {
 		result_count++
 
 		switch result.Result {
-		case match.Player1Wins:
+		case match.Win:
 			tour.Scores[result.Match.Player1].Wins++
 			tour.Scores[result.Match.Player2].Losses++
 
-		case match.Player2Wins:
+		case match.Loss:
 			tour.Scores[result.Match.Player2].Wins++
 			tour.Scores[result.Match.Player1].Losses++
 
@@ -231,9 +231,9 @@ type Result struct {
 
 func (result Result) String() string {
 	switch result.Result {
-	case match.Player1Wins:
+	case match.Win:
 		return fmt.Sprintf("%s wins by %s", result.Match.Engines[0].Name, result.Reason)
-	case match.Player2Wins:
+	case match.Loss:
 		return fmt.Sprintf("%s wins by %s", result.Match.Engines[1].Name, result.Reason)
 	case match.Draw:
 		return fmt.Sprintf("Draw by %s", result.Reason)

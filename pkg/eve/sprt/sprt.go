@@ -163,9 +163,9 @@ func (sprt *SPRT) ResultHandler() {
 			result_count++
 
 			switch result.Result {
-			case match.Player1Wins:
+			case match.Win:
 				sprt.Score.Wins++
-			case match.Player2Wins:
+			case match.Loss:
 				sprt.Score.Losses++
 			case match.Draw:
 				sprt.Score.Draws++
@@ -266,9 +266,9 @@ type Result struct {
 
 func (result Result) String() string {
 	switch result.Result {
-	case match.Player1Wins:
+	case match.Win:
 		return fmt.Sprintf("%s wins by %s", result.Match.Engines[result.Match.Player1].Name, result.Reason)
-	case match.Player2Wins:
+	case match.Loss:
 		return fmt.Sprintf("%s wins by %s", result.Match.Engines[result.Match.Player2].Name, result.Reason)
 	case match.Draw:
 		return fmt.Sprintf("Draw by %s", result.Reason)

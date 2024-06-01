@@ -33,19 +33,19 @@ func Run(config *Config) (Result, string) {
 	var err error
 
 	if remaining_time[0], err = ParseTime(config.Engines[0].TimeC); err != nil {
-		return Player2Wins, err.Error()
+		return Loss, err.Error()
 	}
 
 	if remaining_time[1], err = ParseTime(config.Engines[1].TimeC); err != nil {
-		return Player1Wins, err.Error()
+		return Win, err.Error()
 	}
 
 	if engines[0], err = StartEngine(config.Engines[0]); err != nil {
-		return Player2Wins, err.Error()
+		return Loss, err.Error()
 	}
 
 	if engines[1], err = StartEngine(config.Engines[1]); err != nil {
-		return Player1Wins, err.Error()
+		return Win, err.Error()
 	}
 
 	defer engines[0].Kill()
@@ -106,9 +106,9 @@ func Run(config *Config) (Result, string) {
 			result, reason := oracle.GameResult()
 			switch result {
 			case games.StmWins:
-				return Player1Wins - Result(2*sideToMove), reason
+				return Win - Result(2*sideToMove), reason
 			case games.XtmWins:
-				return Player2Wins + Result(2*sideToMove), reason
+				return Loss + Result(2*sideToMove), reason
 			case games.Draw:
 				return Draw, reason
 			}
