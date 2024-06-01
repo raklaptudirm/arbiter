@@ -27,7 +27,7 @@ func NewTournament(config Config) (*SPRT, error) {
 	sprt.Config = config
 
 	var err error
-	sprt.openings, err = match.NewBook(config.Openings.File, config.Openings.Order)
+	sprt.openings, err = match.NewBook(config.Openings)
 	if err != nil {
 		return nil, err
 	}
@@ -304,12 +304,7 @@ type Config struct {
 	Elo0, Elo1  float64 // The null and the alternate elo hypotheses.
 	Alpha, Beta float64 // Confidence bounds for Error types I and II.
 
-	Openings struct {
-		File string
-		// Format string // only EPD opening files supported.
-		Order string
-		Start int
-	}
+	Openings match.OpeningConfig
 
 	PGNOut string // File to store the game PGNs at.
 	EPDOut string // File to store the game ends EPD at.

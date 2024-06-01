@@ -33,7 +33,7 @@ func NewTournament(config Config) (*Tournament, error) {
 	}, len(config.Engines))
 
 	var err error
-	tour.openings, err = match.NewBook(config.Openings.File, config.Openings.Order)
+	tour.openings, err = match.NewBook(config.Openings)
 	if err != nil {
 		return nil, err
 	}
@@ -281,20 +281,7 @@ type Config struct {
 		Alpha, Beta int // Confidence bounds for Error types I and II.
 	}
 
-	Openings struct {
-		File string
-		// Format string // only EPD opening files supported.
-		Order string
-		Start int
-
-		// When to switch to a new opening in a tournament:
-		// default:
-		Policy string
-
-		// Number of times to play each opening. Only functional if the opening
-		// policy is set to default (or is unset, same difference).
-		Repeat int
-	}
+	Openings match.OpeningConfig
 
 	PGNOut string // File to store the game PGNs at.
 	EPDOut string // File to store the game ends EPD at.
