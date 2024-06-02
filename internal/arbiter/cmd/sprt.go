@@ -11,36 +11,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package arbiter
+package cmd
 
 import (
-	"errors"
-	"io/fs"
 	"os"
-	"path/filepath"
 
-	"github.com/adrg/xdg"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+	"laptudirm.com/x/arbiter/pkg/eve/sprt"
 )
 
-const FilePermissions = 0755
+func SPRT() *cobra.Command {
+	return &cobra.Command{
+		Use:   "sprt details-file",
+		Short: "Run a Sequential Probability Ratio Test",
+		Args:  cobra.ExactArgs(1),
 
-var Directory = filepath.Join(xdg.Home, "arbiter")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			file, err := os.ReadFile(args[0])
+			if err != nil {
+				return err
+			}
 
-func TryMkdir(dir string) {
-	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
-		_ = os.Mkdir(dir, FilePermissions)
+			var config sprt.Config
+			err = yaml.Unmarshal(file, &config)
+			if err != nil {
+				return err
+			}
+
+			tour, err := sprt.NewTournament(config)
+			if err != nil {
+				return err
+			}
+
+			return tour.Start()
+		},
 	}
-}
-
-func TryCreate(file string, data []byte) {
-	if _, err := os.Stat(file); errors.Is(err, fs.ErrNotExist) {
-		_ = os.WriteFile(file, data, FilePermissions)
-	}
-}
-
-func init() {
-	TryMkdir(Directory)
-	TryMkdir(filepath.Join(Directory, "paused"))
-	TryMkdir(filepath.Join(Directory, "paused", "sprt"))
-	TryMkdir(filepath.Join(Directory, "paused", "tour"))
 }

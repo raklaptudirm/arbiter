@@ -40,7 +40,7 @@ func Root() *cobra.Command {
 	root.PersistentFlags().BoolP("trace", "t", false, "Show Trace Information")
 
 	// TODO: properly set version
-	versionStr := "v0.1.0\n"
+	versionStr := "v0.2.0\n"
 	root.SetVersionTemplate(versionStr)
 	root.Version = versionStr
 
@@ -49,6 +49,9 @@ func Root() *cobra.Command {
 	root.AddCommand(Install())
 	root.AddCommand(Completion())
 	root.AddCommand(Remove())
+	root.AddCommand(Tournament())
+	root.AddCommand(SPRT())
+	root.AddCommand(Restart())
 
 	return root
 }
