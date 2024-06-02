@@ -25,6 +25,6 @@ func Restart() *cobra.Command {
 	}
 
 	cmd.AddCommand(restart.SPRT())
-	cmd.AddCommand(restart.Tournament())
+	// cmd.AddCommand(restart.Tournament())
 	return &cmd
 }
