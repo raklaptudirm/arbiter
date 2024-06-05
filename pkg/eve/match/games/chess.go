@@ -19,6 +19,10 @@ func (oracle *ChessOracle) Initialize(fenstr string) {
 	oracle.moves = oracle.board.GenerateMoves(false)
 }
 
+func (oracle *ChessOracle) SideToMove() Color {
+	return Color(oracle.SideToMove())
+}
+
 func (oracle *ChessOracle) MakeMove(mov_str string) error {
 	found, index := false, 0
 	for i, mov := range oracle.moves {

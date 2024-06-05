@@ -16,6 +16,10 @@ func (oracle *AtaxxOracle) Initialize(fenstr string) {
 	oracle.position.SetFen(fenstr)
 }
 
+func (oracle *AtaxxOracle) SideToMove() Color {
+	return Color(oracle.position.turn)
+}
+
 func (oracle *AtaxxOracle) MakeMove(movstr string) error {
 	move, err := NewMove(movstr)
 	if err != nil {

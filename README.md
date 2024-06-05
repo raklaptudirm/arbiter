@@ -12,13 +12,13 @@ command-line tool with interactive prompts to enable easy configuration.
 ## Features
 
 - [x] Game Engine installer and version manager.
-- [ ] Tournament and Testing system using UXI protocols.
+- [x] Tournament and Testing system using UXI protocols.
 
 ## Installation
 
 **Requirements:** [Go 1.20 or greater](https://go.dev/doc/install)
 
 ```sh
-go install laptudirm.com/x/arbiter/cmd/arbiter@latest
+go install laptudirm.com/x/arbiter@latest
 # add ~/arbiter/bin to your PATH to make the installed engines available globally
 ```

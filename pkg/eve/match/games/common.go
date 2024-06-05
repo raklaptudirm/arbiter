@@ -13,11 +13,19 @@ func GetOracle(name string) Oracle {
 
 type Oracle interface {
 	Initialize(fen string)
+	SideToMove() Color
 	MakeMove(mov string) error
 	FEN() string
 	GameResult() (Result, string)
 	ZeroMoves() bool
 }
+
+type Color uint8
+
+const (
+	White Color = iota
+	Black       = iota
+)
 
 type Result uint8
 
