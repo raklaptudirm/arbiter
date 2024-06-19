@@ -17,7 +17,7 @@ func (oracle *AtaxxOracle) Initialize(fenstr string) {
 }
 
 func (oracle *AtaxxOracle) SideToMove() Color {
-	return Color(oracle.position.turn)
+	return Color(1 - oracle.position.turn)
 }
 
 func (oracle *AtaxxOracle) MakeMove(movstr string) error {
