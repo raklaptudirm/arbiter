@@ -40,7 +40,7 @@ func Root() *cobra.Command {
 	root.PersistentFlags().BoolP("trace", "t", false, "Show Trace Information")
 
 	// TODO: properly set version
-	versionStr := "v0.2.1\n"
+	versionStr := "v0.2.2\n"
 	root.SetVersionTemplate(versionStr)
 	root.Version = versionStr
 
