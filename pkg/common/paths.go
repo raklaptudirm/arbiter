@@ -24,7 +24,7 @@ import (
 
 const FilePermissions = 0755
 
-var Directory = filepath.Join(xdg.Home, "arbiter")
+var Directory = filepath.Join(xdg.StateHome, "arbiter")
 
 func TryMkdir(dir string) {
 	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
